@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { getRegionName } from '@/shared/constants/regions';
 
 type RegionStat = { code: string; value: number; name?: string };
 type Props = {
@@ -174,7 +175,8 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
           },
           onEachFeature: (feat: any, layer: L.Path) => {
             const code = String(feat.properties?.code ?? '');
-            const name = (feat.properties?.name ?? code) || 'Регион';
+            // Use centralized region name lookup instead of GeoJSON name
+            const name = getRegionName(code) || 'Регион';
             const v = byCode.get(code) ?? 0;
             layer.bindTooltip(`${name}: ${v}`, { sticky: true, direction: 'top' });
 

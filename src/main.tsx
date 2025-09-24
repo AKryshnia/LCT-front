@@ -12,11 +12,12 @@ import './index.css'
 import AppShell from '@widgets/shell/AppShell'
 import { Toaster } from '@/components/ui/toaster'
 
-if (import.meta.env.DEV) {
+// Only enable MSW in development when not using a real backend
+if (import.meta.env.DEV && !import.meta.env.VITE_API_URL) {
   import('@shared/mocks/browser').then(({ worker }) => {
     worker.start({
       onUnhandledRequest: 'bypass',
-      serviceWorker: { url: '/mockServiceWorker.js' }, // лежит в /public
+      serviceWorker: { url: '/mockServiceWorker.js' },
     });
   });
 }
