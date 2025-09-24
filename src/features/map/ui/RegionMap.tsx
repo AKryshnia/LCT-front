@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 //import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import RussiaFlatMap from './RussiaFlatMap';
+import { getRegionName } from '@/shared/constants/regions';
 
 type RegionData = {
   code: string;
@@ -28,12 +29,10 @@ type RegionMapProps = {
 };
 
 // Mock data - replace with real API calls
-const getRegionData = (code: string): RegionData => {
-  // This is mock data - replace with actual API call
-  const mockData: Record<string, RegionData> = {
+const getRegionData = (code: string): RegionData | null => {
+  const mockData: Record<string, Omit<RegionData, 'code'>> = {
     '46': {
-      code: '46',
-      name: 'Курск',
+      name: getRegionName('46'), // Use the real region name
       population: 434696,
       area: 29800,
       flights: 1500,
@@ -48,22 +47,9 @@ const getRegionData = (code: string): RegionData => {
     },
     // Add more regions as needed
   };
-  
-  return mockData[code] || {
-    code,
-    name: `Регион ${code}`,
-    population: 0,
-    area: 0,
-    flights: 0,
-    avgDuration: 0,
-    growth: 0,
-    place: 0,
-    responsible: 'Не назначен',
-    avatar: '',
-    hasDevelopmentProgram: false,
-    specialization: 'Не указана',
-    hasTestSite: false,
-  };
+
+  const data = mockData[code];
+  return data ? { ...data, code } : null;
 };
 
 export const RegionMap: React.FC<RegionMapProps> = ({
@@ -98,7 +84,7 @@ export const RegionMap: React.FC<RegionMapProps> = ({
     return regionsData.map(region => ({
       code: region.code,
       value: region.flights ?? 0,
-      name: region.name ?? `Регион ${region.code}`,
+      name: getRegionName(region.code) ?? `Регион ${region.code}`,
       selected: region.code === selectedRegion,
     }));
   }, [regionsData, selectedRegion]);

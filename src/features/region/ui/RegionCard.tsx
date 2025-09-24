@@ -1,7 +1,8 @@
 // src/features/region/ui/RegionCard.tsx
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { useGetRegionsQuery, useGetCitiesQuery } from '@/shared/api/lctApi';
+import { useGetRegionsQuery, useGetCitiesQuery, useGetRegionStatsQuery, useGetRegionProfileQuery } from '@/shared/api/lctApi';
+import { getRegionName } from '@/shared/constants/regions';
 
 type RegionItem = {
   code: string;
@@ -31,44 +32,34 @@ type Props = {
 };
 
 export default function RegionCard({ code, period }: Props) {
-  const [item, setItem] = React.useState<RegionItem | null>(null);
-  const [profile, setProfile] = React.useState<RegionProfile | null>(null);
-  const [loading, setLoading] = React.useState(false);
+  // Get region name from our centralized constants
+  const regionName = getRegionName(code);
 
   // External APIs (real backend) via RTK Query
-  const { data: regions } = useGetRegionsQuery();
-  const { data: citiesPaged } = useGetCitiesQuery({ page: 1, per_page: 100 });
+  const { data: regions, isLoading: isLoadingRegions } = useGetRegionsQuery();
+  const { data: citiesPaged, isLoading: isLoadingCities } = useGetCitiesQuery({ page: 1, per_page: 100 });
+  
+  // Get region stats and profile using RTK Query
+  const { data: statsData, isLoading: isLoadingStats } = useGetRegionStatsQuery({ 
+    region: code, 
+    period 
+  });
+  
+  const { data: profileData, isLoading: isLoadingProfile } = useGetRegionProfileQuery({ 
+    code 
+  });
+
   const regionFromApi = React.useMemo(() => (regions ?? []).find(r => r.code === code), [regions, code]);
   const capitalFromApi = React.useMemo(() => regionFromApi?.capital?.name, [regionFromApi]);
 
-  React.useEffect(() => {
-    let ignore = false;
-    (async () => {
-      try {
-        setLoading(true);
-        const [statsRes, profileRes] = await Promise.all([
-          fetch(`/api/stats?region=${code}&period=${encodeURIComponent(period)}`),
-          fetch(`/api/region/profile?code=${code}`),
-        ]);
-        const statsJson = await statsRes.json();
-        const profileJson = await profileRes.json();
-        if (!ignore) {
-          setItem((statsJson?.items ?? [])[0] ?? null);
-          setProfile((profileJson?.data as RegionProfile) ?? null);
-        }
-      } catch (e) {
-        if (!ignore) {
-          setItem(null);
-          setProfile(null);
-        }
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    })();
-    return () => { ignore = true; };
-  }, [code, period]);
+  // Use the region name from our constants as a fallback
+  const displayName = regionFromApi?.name || regionName;
+  const item = statsData?.items?.[0] || null;
+  const profile = profileData?.data || null;
 
-  const title = regionFromApi?.name ?? item?.name ?? `Регион ${code}`;
+  const loading = isLoadingRegions || isLoadingCities || isLoadingStats || isLoadingProfile;
+
+  const title = displayName;
   const population = regionFromApi?.population ? Number(regionFromApi.population.replace(/\s/g, '')) : item?.population;
   const area = item?.area_km2; // external API may lack area — keep from stats
 

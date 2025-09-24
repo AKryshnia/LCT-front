@@ -32,6 +32,8 @@ import {
   useGetRankQuery,
 } from '@/shared/api/lctApi';
 
+import { getRegionName } from '@/shared/constants/regions';
+
 type PeriodMode = 'all' | 'year' | 'quarter' | 'month';
 
 export default function DashboardPage() {
@@ -115,39 +117,7 @@ export default function DashboardPage() {
 
   return (
     <div className="px-6 py-5">
-      {/* Верхние фильтры (как в макете) */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
-            <SelectTrigger className="w-[180px] h-9">
-              <SelectValue placeholder="За всё время" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">За всё время</SelectItem>
-              <SelectItem value="year">За год</SelectItem>
-              <SelectItem value="quarter">За квартал</SelectItem>
-              <SelectItem value="month">За месяц</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1">
-                Россия
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem>Россия</DropdownMenuItem>
-              <DropdownMenuItem>Город</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
       <div className="grid grid-cols-12 gap-4">
-
-
         {/* Правая колонка (всегда видна): общая статистика */}
         <aside className="col-span-12 xl:col-span-4 space-y-4">
           {/* Region + Period (как в макете, в правой панели) */}
@@ -155,7 +125,7 @@ export default function DashboardPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="justify-between">
-                  {selectedRegion ? `Регион ${selectedRegion}` : 'Россия'}
+                  {selectedRegion ? getRegionName(selectedRegion) : 'Россия'}
                   <ChevronDown className="w-4 h-4 ml-2" />
                 </Button>
               </DropdownMenuTrigger>

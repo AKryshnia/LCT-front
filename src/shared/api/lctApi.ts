@@ -23,6 +23,16 @@ export const lctApi = createApi({
       providesTags: ['Region'],
     }),
 
+    getRegionStats: build.query<{ items: any[] }, { region: string; period: string }>({
+      query: ({ region, period }) => `/stats?region=${region}&period=${encodeURIComponent(period)}`,
+      providesTags: ['Stats'],
+    }),
+
+    getRegionProfile: build.query<{ data: any }, { code: string }>({
+      query: ({ code }) => `/region/profile?code=${code}`,
+      providesTags: ['Region'],
+    }),
+
     getCities: build.query<Paged<CityRow>, { page?: number; per_page?: number }>({
       query: ({ page = 1, per_page = 100 } = {}) => `/city?page=${page}&per_page=${per_page}`,
       transformResponse: (res: Paged<CityRow>) => res,
@@ -81,4 +91,6 @@ export const {
   useGetTimeseriesQuery,
   useGetRankQuery,
   useGetInsightQuery,
+  useGetRegionStatsQuery,
+  useGetRegionProfileQuery,
 } = lctApi;
