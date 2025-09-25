@@ -148,10 +148,10 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
     map.createPane('outline'); map.getPane('outline')!.style.zIndex = '500';
 
     // MASK (опционально)
-    fetch('/russia-mask.geojson').then(r => r.ok ? r.json() : null).then(mask => {
+    {/*fetch('/russia-mask.geojson').then(r => r.ok ? r.json() : null).then(mask => {
       if (!mask) return;
       L.geoJSON(mask, { pane: 'mask', interactive: false, style: { fillColor: '#F4F9FC', fillOpacity: 1, stroke: false } }).addTo(map);
-    }).catch(()=>{});
+    }).catch(()=>{});*/}
 
     // REGIONS
     fetch('/regions-simplified.geojson')
@@ -196,14 +196,14 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
         regionsLayerRef.current = regions;
 
         // OUTLINE (береговая линия/общий контур)
-        fetch('/russia-outline.geojson').then(r => r.ok ? r.json() : null).then(outline => {
+        {/*fetch('/russia-outline.geojson').then(r => r.ok ? r.json() : null).then(outline => {
           if (!outline) return;
           outlineRef.current = L.geoJSON(outline, {
             pane: 'outline',
             interactive: false,
             style: { color: '#0E7490', weight: 2.5, opacity: 0.35 }, // лёгкая «дымка» по краю
           }).addTo(map);
-        }).catch(()=>{});
+        }).catch(()=>{});*/}
       });
 
     return () => {
