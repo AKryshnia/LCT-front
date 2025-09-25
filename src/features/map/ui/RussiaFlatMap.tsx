@@ -71,7 +71,7 @@ function darken(hex: string, by = 0.10) {
 }
 
 // гарантируем наличие <defs> в корневом SVG
-function getDefs(map: L.Map): SVGDefsElement | null {
+{/*function getDefs(map: L.Map): SVGDefsElement | null {
   const svg = map.getPanes().overlayPane.querySelector('svg') as SVGSVGElement | null;
   if (!svg) return null;
   let defs = svg.querySelector('#ru-gradients') as SVGDefsElement | null;
@@ -118,7 +118,7 @@ function applyRegionGradient(map: L.Map, layer: L.Path, code: string, base: stri
   const bottom = darken(base, 0.10);
   const fillUrl = upsertGradient(defs, `grad-${code}`, top, bottom);
   el.setAttribute('fill', fillUrl);
-}
+}*/}
 
 /* ───── компонент ───── */
 export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, overlay, sideOverlay }: Props) {
@@ -181,7 +181,7 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
             layer.bindTooltip(`${name}: ${v}`, { sticky: true, direction: 'top' });
 
             // назначаем градиент
-            applyRegionGradient(map, layer, code, baseFill(v));
+            //applyRegionGradient(map, layer, code, baseFill(v));
 
             layer.on('mouseover', function (this: L.Path) {
               this.setStyle({ weight: 2.2, opacity: 1 });
@@ -228,7 +228,7 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
         fillColor: base,
         // stroke остаётся прежним
       } as L.PathOptions);
-      applyRegionGradient(map, layer as L.Path, code ?? 'x', base);
+      //applyRegionGradient(map, layer as L.Path, code ?? 'x', base);
     });
   }, [byCode]);
 
