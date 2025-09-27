@@ -23,7 +23,8 @@ let codesCache: string[] | undefined
 async function ensureCodes(): Promise<string[]> {
   if (codesCache?.length) return codesCache
   try {
-    const geo = await fetch('/regions-simplified.geojson').then((r) => r.json())
+    const geo = await fetch('/regions-simplified.patched.geojson').then(r => r.ok ? r.json() : null)
+    if (!geo) return fallbackCodes;
     const codes: string[] = (geo.features ?? [])
       .map((f: any) => String(f.properties?.code ?? '').padStart(2, '0'))
       .filter(Boolean)

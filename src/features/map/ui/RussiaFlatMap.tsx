@@ -155,10 +155,11 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
 
     // REGIONS
     fetch('/regions-simplified.geojson')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : null)
       .then((geo) => {
+        if (!geo) return;
         const regions = L.geoJSON(geo, {
-          pane: 'regions',
+          //pane: 'regions',
           // МЯГКИЕ ГРАНИЦЫ + базовый fill (будет заменён градиентом ниже)
           style: (feat: any): L.PathOptions => {
             const v = byCode.get(feat.properties?.code) ?? 0;
