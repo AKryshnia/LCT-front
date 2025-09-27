@@ -50,9 +50,10 @@ export default function RussiaChoropleth({
       return `${n}: ${v}`;
     };
 
-    fetch('/regions-simplified.geojson')
-      .then((r) => r.json())
+    fetch('/regions-simplified.patched.geojson')
+      .then(r => r.ok ? r.json() : null)
       .then((geo) => {
+        if (!geo) return;
         const gjson = L.geoJSON(geo, {
           style: (feat: any) => {
             const v = byCode.get(feat.properties?.code) ?? 0;

@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 type Props = {
   regionCode: string; // "77"
   height?: number;
+  onSelect?: (code: string) => void;
 };
 
 export default function RegionFocusedMap({ regionCode, height = 700 }: Props) {
@@ -37,9 +38,10 @@ export default function RegionFocusedMap({ regionCode, height = 700 }: Props) {
       regionLayerRef.current = null;
     }
 
-    fetch('/regions-simplified.geojson')
-      .then((r) => r.json())
+    fetch('/regions-simplified.patched.geojson')
+      .then(r => r.ok ? r.json() : null)
       .then((geo) => {
+        if (!geo) return;
         const only = {
           type: 'FeatureCollection',
           features: (geo.features || []).filter((f: any) => String(f.properties?.code).padStart(2, '0') === regionCode),
