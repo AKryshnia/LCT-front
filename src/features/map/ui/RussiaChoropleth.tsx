@@ -1,3 +1,4 @@
+// RussiaChoropleth.tsx
 import React, { useEffect, useMemo, useRef } from 'react';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -5,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import CompareSheet from '@/features/compare/ui/CompareSheet';
 import { useGetChoroplethQuery } from '@/shared/api/lctApi';
+import { loadGeoJson } from '@/shared/lib/geoJsonLoader';
 
 type RegionStat = { code: string; value: number; name?: string };
 
@@ -15,6 +17,7 @@ type Props = {
   onSelect?: (code: string) => void;
 };
 
+const GEO_URL = '/regions-simplified.patched.geojson';
 const scale = (v: number) =>
   v > 80 ? '#0B4A6F' : v > 60 ? '#1379A6' : v > 40 ? '#23A4CF' : v > 20 ? '#66C4E1' : '#BFE8F4';
 
@@ -24,20 +27,25 @@ export default function RussiaChoropleth({
   period = '2025-Q3',
   onSelect,
 }: Props) {
-  // load choropleth from API
+  // API
   const { data: apiChoropleth } = useGetChoroplethQuery({ metric, period });
 
-  // real data source (API → props → empty)
+  // итоговый источник данных
   const source: RegionStat[] = (apiChoropleth as any as RegionStat[]) ?? data ?? [];
-  const byCode = useMemo(() => new Map(source.map((d) => [d.code, d.value])), [apiChoropleth, data]);
+  const byCode = useMemo(
+    () => new Map(source.map((d) => [String(d.code).padStart(2, '0'), Number(d.value) || 0])),
+    [apiChoropleth, data]
+  );
 
   // refs
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.GeoJSON<any> | null>(null);
+  const initDone = useRef(false); // защита от повторной инициализации в StrictMode
 
   // init map and layer — once
   useEffect(() => {
-    if (mapRef.current) return;
+    if (initDone.current) return;
+    initDone.current = true;
 
     const map = L.map('map-root', { zoomControl: false }).setView([61, 100], 3);
     mapRef.current = map;
@@ -45,18 +53,21 @@ export default function RussiaChoropleth({
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     const tooltipText = (feat: any) => {
-      const v = byCode.get(feat.properties?.code) ?? 0;
-      const n = feat.properties?.name ?? feat.properties?.code ?? '';
+      const code = String(feat?.properties?.code ?? '').padStart(2, '0');
+      const v = byCode.get(code) ?? 0;
+      const n = feat?.properties?.name ?? code;
       return `${n}: ${v}`;
     };
 
-    fetch('/regions-simplified.patched.geojson')
-      .then(r => r.ok ? r.json() : null)
+    // ⬇️ общий лоадер (дедуплицирует параллельные запросы)
+    loadGeoJson(GEO_URL)
       .then((geo) => {
-        if (!geo) return;
-        const gjson = L.geoJSON(geo, {
+        if (!geo || !mapRef.current) return;
+
+        const gjson = L.geoJSON(geo as any, {
           style: (feat: any) => {
-            const v = byCode.get(feat.properties?.code) ?? 0;
+            const code = String(feat?.properties?.code ?? '').padStart(2, '0');
+            const v = byCode.get(code) ?? 0;
             return { color: '#fff', weight: 2, fillColor: scale(v), fillOpacity: 1 };
           },
           onEachFeature: (feat: any, layer: any) => {
@@ -64,7 +75,7 @@ export default function RussiaChoropleth({
 
             layer.on('mouseover', () => layer.setStyle({ weight: 3, color: '#334155' }));
             layer.on('mouseout', () => layer.setStyle({ weight: 2, color: '#fff' }));
-            layer.on('click', () => onSelect?.(feat.properties?.code));
+            layer.on('click', () => onSelect?.(String(feat?.properties?.code).padStart(2, '0')));
 
             layer.on('add', () => {
               const el = layer.getElement?.();
@@ -76,10 +87,9 @@ export default function RussiaChoropleth({
         layerRef.current = gjson;
         try {
           map.fitBounds(gjson.getBounds(), { padding: [40, 40] });
-        } catch {
-          /* ignore */
-        }
-      });
+        } catch {}
+      })
+      .catch(console.error);
 
     // legend
     const legend = new L.Control({ position: 'bottomleft' } as L.ControlOptions);
@@ -102,29 +112,30 @@ export default function RussiaChoropleth({
     legend.addTo(map);
 
     return () => {
-      map.remove();
+      try { map.remove(); } catch {}
       mapRef.current = null;
       layerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onSelect]); // init once, updates below
+  }, [onSelect]); // инициализация 1 раз
 
   // update style and tooltips on data change
   useEffect(() => {
     if (!layerRef.current) return;
 
     const tooltipText = (feat: any) => {
-      const v = byCode.get(feat.properties?.code) ?? 0;
-      const n = feat.properties?.name ?? feat.properties?.code ?? '';
+      const code = String(feat?.properties?.code ?? '').padStart(2, '0');
+      const v = byCode.get(code) ?? 0;
+      const n = feat?.properties?.name ?? code;
       return `${n}: ${v}`;
     };
 
     layerRef.current.setStyle((feat: any) => {
-      const v = byCode.get(feat.properties?.code) ?? 0;
+      const code = String(feat?.properties?.code ?? '').padStart(2, '0');
+      const v = byCode.get(code) ?? 0;
       return { color: '#fff', weight: 2, fillColor: scale(v), fillOpacity: 1 };
     });
 
-    // update tooltips
     (layerRef.current as any).eachLayer?.((l: any) => {
       const f = l.feature;
       const t = l.getTooltip?.();
@@ -134,7 +145,6 @@ export default function RussiaChoropleth({
 
   return (
     <div className="relative">
-      {/* buttons on top of the map */}
       <div className="absolute right-4 top-4 flex gap-2 z-[1000]">
         <CompareSheet all={(data ?? source) as any} />
         <Button size="icon" className="rounded-full">

@@ -11,6 +11,8 @@ import RatingBuilder from '@pages/admin/RatingBuilder'
 import './index.css'
 import AppShell from '@widgets/shell/AppShell'
 import { Toaster } from '@/components/ui/toaster'
+import { preloadGeoJson } from '@/shared/lib/geoJsonLoader'
+import { GEO_URL } from '@/shared/constants/geo'
 
 // Only enable MSW in development when not using a real backend
 if (import.meta.env.DEV && !import.meta.env.VITE_API_URL) {
@@ -29,6 +31,9 @@ const router = createBrowserRouter([
   { path: '/admin', element: <AppShell><AdminPage /></AppShell> },
   { path: '/admin/builder', element: <AppShell><RatingBuilder /></AppShell> },
 ])
+
+
+preloadGeoJson(GEO_URL);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
