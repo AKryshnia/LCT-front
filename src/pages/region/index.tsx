@@ -17,9 +17,9 @@ export const RegionPage: React.FC = () => {
   const { data: regions } = useGetRegionsQuery();
   const meta = regions?.find((r) => r.code === code);
 
-  const { data: kpi } = useGetKpiQuery({ region: code, period });
-  const { data: series } = useGetTimeseriesQuery({ region: code, period });
-  const { data: rank } = useGetRankQuery({ region: code, period });
+  const { data: kpi } = useGetKpiQuery({ region: code, period, metric: 'count' });
+  const { data: series } = useGetTimeseriesQuery({ region: code, period, metric: 'count' });
+  const { data: rank } = useGetRankQuery({ region: code, period, metric: 'count' });
 
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-6">
@@ -72,12 +72,12 @@ export const RegionPage: React.FC = () => {
             <CardTitle className="text-base">KPI за период {period}</CardTitle>
           </CardHeader>
           <CardContent>
-            <KpiTiles
-              totalFlights={kpi?.total_flights ?? 0}
-              avgDurationMin={kpi?.avg_duration_min ?? 0}
-              growthPct={kpi?.growth_ratio_pct ?? 0}
-              dailyAvg={kpi?.daily_avg ?? 0}
-            />
+          <KpiTiles
+            totalFlights={kpi?.totalFlights ?? 0}
+            avgDurationMin={kpi?.avgDurationMin ?? 0}
+            growthPct={kpi?.ratio ?? 0}
+            dailyAvg={kpi?.peakHour ?? 0}
+          />
           </CardContent>
         </Card>
 

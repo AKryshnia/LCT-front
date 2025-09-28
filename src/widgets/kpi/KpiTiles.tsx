@@ -32,12 +32,12 @@ export default function KpiTiles(props: Props) {
   const region = ('region' in props && props.region) || 'RU';
   const period = ('period' in props && props.period) || '2025-Q3';
 
-  const { data } = useGetKpiQuery({ region, period }, { skip: !needFetch });
+  const { data } = useGetKpiQuery({ period, region, metric: 'count' }, { skip: !needFetch });
 
-  const totalFlights = needFetch ? data?.total_flights ?? 0 : (props as any).totalFlights;
-  const avgDurationMin = needFetch ? data?.avg_duration_min ?? 0 : (props as any).avgDurationMin;
-  const growthPct = needFetch ? data?.growth_ratio_pct ?? 0 : (props as any).growthPct;
-  const dailyAvg = needFetch ? data?.daily_avg ?? 0 : (props as any).dailyAvg;
+  const totalFlights = needFetch ? data?.totalFlights ?? 0 : (props as any).totalFlights;
+  const avgDurationMin = needFetch ? data?.avgDurationMin ?? 0 : (props as any).avgDurationMin;
+  const growthPct = needFetch ? data?.ratio ?? 0 : (props as any).growthPct;
+  const dailyAvg = needFetch ? data?.peakHour ?? 0 : (props as any).dailyAvg;
 
   return (
     <div className="grid grid-cols-2 gap-3">

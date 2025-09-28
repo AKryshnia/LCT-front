@@ -27,9 +27,11 @@ import { ChevronDown, PlaneTakeoff, PlaneLanding } from 'lucide-react';
 
 import {
   useGetChoroplethQuery,
+  useGetFlightsQuery,
   useGetInsightQuery,
   useGetTimeseriesQuery,
   useGetRankQuery,
+  useGetRegionsQuery,
 } from '@/shared/api/lctApi';
 
 import { getRegionName } from '@/shared/constants/regions';
@@ -54,18 +56,20 @@ export default function DashboardPage() {
     }
   }, [periodMode]);
 
+  const { data: regions, isLoading: isLoadingRegions } = useGetRegionsQuery();
+  
   // Data for map coloring
   const { data: choropleth } = useGetChoroplethQuery({ metric: 'count', period: apiPeriod });
 
   // Insight copy under filters
-  const { data: insight } = useGetInsightQuery({ region: 'RU', period: apiPeriod });
+  const { data: insight } = useGetInsightQuery({ metric: 'count', period: apiPeriod });
 
   // Current rank widget (overlay on the map)
-  const { data: rank } = useGetRankQuery({ region: selectedRegion ?? 'RU', period: apiPeriod });
+  const { data: rank } = useGetRankQuery({ metric: 'count', period: apiPeriod, region: selectedRegion ?? 'RU' });
 
   // Timeseries for trend chart
   const tsPeriod = periodMode === 'month' ? apiPeriod : '2025-07';
-  const { data: series } = useGetTimeseriesQuery({ region: selectedRegion ?? 'RU', period: tsPeriod });
+  const { data: series } = useGetTimeseriesQuery({ metric: 'count', region: selectedRegion ?? 'RU', period: tsPeriod });
 
   const trendData: TrendPoint[] = React.useMemo(() => {
     const monthLabel = 'Июля'; // демо: для 2025-07
@@ -120,35 +124,44 @@ export default function DashboardPage() {
       <div className="grid grid-cols-12 gap-4">
         {/* Правая колонка (всегда видна): общая статистика */}
         <aside className="col-span-12 xl:col-span-4 space-y-4">
-          {/* Region + Period (как в макете, в правой панели) */}
+          {/* Region + Period */}
           <div className="grid grid-cols-2 gap-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="justify-between">
-                  {selectedRegion ? getRegionName(selectedRegion) : 'Россия'}
-                  <ChevronDown className="w-4 h-4 ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => setSelectedRegion(null)}>Россия</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Регион */}
+            <div className="flex flex-col gap-1">
+              <div className="text-base font-medium">Регион</div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="justify-between border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-100">
+                    {selectedRegion ? getRegionName(selectedRegion) : 'Россия'}
+                    <ChevronDown className="w-4 h-4 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => setSelectedRegion(null)}>Россия</DropdownMenuItem>
+                  {/* тут при необходимости можно подставить список регионов */}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
-            <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="За всё время" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">За всё время</SelectItem>
-                <SelectItem value="year">За год</SelectItem>
-                <SelectItem value="quarter">За квартал</SelectItem>
-                <SelectItem value="month">За месяц</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Период */}
+            <div className="flex flex-col gap-1">
+              <div className="text-base font-medium">Период</div>
+              <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
+                <SelectTrigger className="h-9 border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-100">
+                  <SelectValue placeholder="За квартал" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="quarter">За квартал</SelectItem>
+                  <SelectItem value="year">За год</SelectItem>
+                  <SelectItem value="month">За месяц</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
+
           {/* Инсайт: топ-3 регионов / активность БВС */}
-          <Card>
+          <Card className="border border-transparent shadow-none">
             <CardContent className="p-4">
               <div className="text-xl font-semibold leading-snug">
                 {insight?.title ?? 'Регион N вошёл в топ-3 по росту активности'}
@@ -160,7 +173,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Рейтинг регионов */}
-          <Card>
+          <Card className="border border-slate-50 border-[1px] rounded-[16px] p-6 bg-slate-50 shadow-none">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Рейтинг регионов</CardTitle>
             </CardHeader>
