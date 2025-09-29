@@ -7,6 +7,7 @@ import { Search } from 'lucide-react';
 import CompareSheet from '@/features/compare/ui/CompareSheet';
 import { useGetChoroplethQuery } from '@/shared/api/lctApi';
 import { loadGeoJson } from '@/shared/lib/geoJsonLoader';
+import { GEO_URL } from '@/shared/constants/geo';
 
 type RegionStat = { code: string; value: number; name?: string };
 
@@ -17,7 +18,6 @@ type Props = {
   onSelect?: (code: string) => void;
 };
 
-const GEO_URL = '/regions-simplified.patched.geojson';
 const scale = (v: number) =>
   v > 80 ? '#0B4A6F' : v > 60 ? '#1379A6' : v > 40 ? '#23A4CF' : v > 20 ? '#66C4E1' : '#BFE8F4';
 

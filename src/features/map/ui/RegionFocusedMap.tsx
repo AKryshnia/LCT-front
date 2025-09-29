@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { loadGeoJson } from '@/shared/lib/geoJsonLoader';
 
 type Props = {
   regionCode: string; // "77"
@@ -38,8 +39,7 @@ export default function RegionFocusedMap({ regionCode, height = 700 }: Props) {
       regionLayerRef.current = null;
     }
 
-    fetch('/regions-simplified.patched.geojson')
-      .then(r => r.ok ? r.json() : null)
+    loadGeoJson('/regions-simplified.patched.geojson')
       .then((geo) => {
         if (!geo) return;
         const only = {
