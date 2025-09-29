@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getRegionName } from '@/shared/constants/regions';
+import { loadGeoJson } from '@/shared/lib/geoJsonLoader';
 
 type RegionStat = { code: string; value: number; name?: string };
 type Props = {
@@ -70,56 +71,6 @@ function darken(hex: string, by = 0.10) {
   return hslToHex(h, s, Math.max(0, l - by));
 }
 
-// гарантируем наличие <defs> в корневом SVG
-{/*function getDefs(map: L.Map): SVGDefsElement | null {
-  const svg = map.getPanes().overlayPane.querySelector('svg') as SVGSVGElement | null;
-  if (!svg) return null;
-  let defs = svg.querySelector('#ru-gradients') as SVGDefsElement | null;
-  if (!defs) {
-    defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs') as SVGDefsElement;
-    defs.id = 'ru-gradients';
-    svg.prepend(defs);
-  }
-  return defs;
-}
-
-function upsertGradient(defs: SVGDefsElement, id: string, topColor: string, bottomColor: string) {
-  const ns = 'http://www.w3.org/2000/svg';
-  let g = defs.querySelector(`#${id}`) as SVGLinearGradientElement | null;
-  if (!g) {
-    g = document.createElementNS(ns, 'linearGradient');
-    g.id = id;
-    g.setAttribute('x1', '0'); g.setAttribute('y1', '0');
-    g.setAttribute('x2', '0'); g.setAttribute('y2', '1'); // сверху вниз
-    g.setAttribute('gradientUnits', 'objectBoundingBox'); // нормируется к bbox пути
-    defs.appendChild(g);
-    const s1 = document.createElementNS(ns, 'stop');
-    s1.setAttribute('offset', '0%');
-    g.appendChild(s1);
-    const s2 = document.createElementNS(ns, 'stop');
-    s2.setAttribute('offset', '100%');
-    g.appendChild(s2);
-  }
-  const [s1, s2] = Array.from(g.querySelectorAll('stop'));
-  s1.setAttribute('stop-color', topColor);
-  s1.setAttribute('stop-opacity', '1');
-  s2.setAttribute('stop-color', bottomColor);
-  s2.setAttribute('stop-opacity', '1');
-  return `url(#${id})`;
-}
-
-function applyRegionGradient(map: L.Map, layer: L.Path, code: string, base: string) {
-  const defs = getDefs(map);
-  const el = (layer as any).getElement?.() as SVGPathElement | null
-           || (layer as any)._path as SVGPathElement | undefined;
-  if (!defs || !el) return;
-
-  const top = lighten(base, 0.12);
-  const bottom = darken(base, 0.10);
-  const fillUrl = upsertGradient(defs, `grad-${code}`, top, bottom);
-  el.setAttribute('fill', fillUrl);
-}*/}
-
 /* ───── компонент ───── */
 export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, overlay, sideOverlay }: Props) {
   const mapRef = useRef<L.Map | null>(null);
@@ -147,15 +98,8 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
     map.createPane('regions'); map.getPane('regions')!.style.zIndex = '400';
     map.createPane('outline'); map.getPane('outline')!.style.zIndex = '500';
 
-    // MASK (опционально)
-    {/*fetch('/russia-mask.geojson').then(r => r.ok ? r.json() : null).then(mask => {
-      if (!mask) return;
-      L.geoJSON(mask, { pane: 'mask', interactive: false, style: { fillColor: '#F4F9FC', fillOpacity: 1, stroke: false } }).addTo(map);
-    }).catch(()=>{});*/}
-
     // REGIONS
-    fetch('/regions-simplified.geojson')
-      .then(r => r.ok ? r.json() : null)
+    loadGeoJson('regions-simplified.patched.geojson')
       .then((geo) => {
         if (!geo) return;
         const regions = L.geoJSON(geo, {
@@ -195,16 +139,6 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
           },
         }).addTo(map);
         regionsLayerRef.current = regions;
-
-        // OUTLINE (береговая линия/общий контур)
-        {/*fetch('/russia-outline.geojson').then(r => r.ok ? r.json() : null).then(outline => {
-          if (!outline) return;
-          outlineRef.current = L.geoJSON(outline, {
-            pane: 'outline',
-            interactive: false,
-            style: { color: '#0E7490', weight: 2.5, opacity: 0.35 }, // лёгкая «дымка» по краю
-          }).addTo(map);
-        }).catch(()=>{});*/}
       });
 
     return () => {
