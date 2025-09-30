@@ -10,7 +10,7 @@ export default function RatingBuilder(){
   const norm = { flights: Math.round(w.flights/total*100), duration: Math.round(w.duration/total*100), growth: Math.round(w.growth/total*100) }
   const save = () => { localStorage.setItem('rating_preset_default', JSON.stringify(norm)); alert('Сохранено: '+JSON.stringify(norm)) }
   return (
-    <RoleGuard allow={['admin','superadmin']}>
+    <RoleGuard allow={['admin']}>
       <div className="max-w-3xl mx-auto p-6 space-y-4">
         <h1 className="text-2xl font-bold">Конструктор рейтингов (MVP)</h1>
         <Card><CardContent className="p-4 space-y-4">

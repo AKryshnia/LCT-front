@@ -14,7 +14,7 @@ export default function UploadsPage(){
     setBusy(true); await fetch('/api/uploads', { method:'POST', body: fd }); setBusy(false); reload()
   }
   return (
-    <RoleGuard allow={['operator','admin','superadmin']}>
+    <RoleGuard allow={['operator','admin']}>
       <div className="max-w-5xl mx-auto p-6 space-y-4">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">Журнал загрузок</h1>

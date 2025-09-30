@@ -1,5 +1,6 @@
 // src/pages/dashboard/index.tsx
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import RussiaFlatMap from '@/features/map/ui/RussiaFlatMap';
 import RegionCard from '@/features/region/ui/RegionCard';
 import AreaTrend, { TrendPoint } from '@/widgets/charts/AreaTrend';
@@ -39,8 +40,20 @@ import { getRegionName } from '@/shared/constants/regions';
 type PeriodMode = 'all' | 'year' | 'quarter' | 'month';
 
 export default function DashboardPage() {
-  const [selectedRegion, setSelectedRegion] = React.useState<string | null>(null);
-  const [periodMode, setPeriodMode] = React.useState<PeriodMode>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlRegion = searchParams.get('region');
+  const urlPeriod = searchParams.get('period') as PeriodMode | null;
+
+  const [selectedRegion, setSelectedRegion] = React.useState<string | null>(urlRegion);
+  const [periodMode, setPeriodMode] = React.useState<PeriodMode>(urlPeriod || 'quarter');
+
+  // Синхронизация состояния с URL
+  React.useEffect(() => {
+    const params = new URLSearchParams();
+    if (selectedRegion) params.set('region', selectedRegion);
+    if (periodMode && periodMode !== 'quarter') params.set('period', periodMode);
+    setSearchParams(params, { replace: true });
+  }, [selectedRegion, periodMode, setSearchParams]);
 
   // Map UI period to API period strings
   const apiPeriod = React.useMemo(() => {
@@ -137,8 +150,12 @@ export default function DashboardPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={() => setSelectedRegion(null)}>Россия</DropdownMenuItem>
-                  {/* тут при необходимости можно подставить список регионов */}
+                <DropdownMenuItem onClick={() => setSelectedRegion(null)}>Россия</DropdownMenuItem>
+                {(regions ?? []).slice(0, 10).map((r) => (
+                  <DropdownMenuItem key={r.code} onClick={() => setSelectedRegion(r.code)}>
+                    {r.name}
+                  </DropdownMenuItem>
+                ))}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

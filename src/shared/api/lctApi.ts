@@ -42,6 +42,19 @@ export type TimeseriesPoint = { date: string; value: number };
 export type Kpi = { totalFlights: number; avgDurationMin: number; ratio?: number; peakHour?: number };
 export type MetaResponse = { periods: string[]; metrics: { id: string; name: string }[] };
 
+export type RegionStatistics = {
+  region: { id: number; name: string; name_alt?: string };
+  summary: { total_flights: number; years_covered: number; weeks_covered: number };
+  statistics: {
+    by_year: Array<{ year: number; flight_count: number; avg_flight_time: number; min_flight_time: number; max_flight_time: number }>;
+    by_year_and_month: Array<{ year: number; months: Array<{ month: number; flight_count: number; avg_flight_time: number; min_flight_time: number; max_flight_time: number }> }>;
+    by_year_and_week: Array<{ year: number; weeks: Array<{ week_number: number; flight_count: number; avg_flight_time: number; min_flight_time: number; max_flight_time: number }> }>;
+    by_quarter: Array<{ quarter: number; flight_count: number; avg_flight_time: number; min_flight_time: number; max_flight_time: number }>;
+    by_year_and_quarter: Array<{ year: number; quarters: Array<{ quarter: number; flight_count: number; avg_flight_time: number; min_flight_time: number; max_flight_time: number }> }>;
+    by_year_and_season: Array<{ year: number; seasons: Array<{ season: string; flight_count: number; avg_flight_time: number; min_flight_time: number; max_flight_time: number }> }>;
+  };
+};
+
 /* ===================== Утилиты ===================== */
 
 const z2 = (v: any) => String(v ?? '').padStart(2, '0');
@@ -68,17 +81,25 @@ const durationMin = (f: FlightRow) => {
 };
 
 const periodToRange = (p: string): [string, string] => {
-  const m = /^(\d{4})-Q([1-4])$/.exec(p);
-  if (m) {
-    const y = Number(m[1]), q = Number(m[2]);
-    const sm = [1, 4, 7, 10][q - 1];
-    const start = new Date(Date.UTC(y, sm - 1, 1));
-    const end = new Date(Date.UTC(y, sm + 2, 0));
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
-    return [iso(start), iso(end)];
+  const q = /^(\d{4})-Q([1-4])$/.exec(p);
+  if (q) {
+    const y = +q[1], n = +q[2];
+    const sm = [1,4,7,10][n-1];
+    const s = new Date(Date.UTC(y, sm-1, 1));
+    const e = new Date(Date.UTC(y, sm+2, 0));
+    const iso = (d: Date) => d.toISOString().slice(0,10);
+    return [iso(s), iso(e)];
   }
-  const g = /^(\d{4})$/.exec(p);
-  if (g) return [`${g[1]}-01-01`, `${g[1]}-12-31`];
+  const m = /^(\d{4})-(\d{2})$/.exec(p);               // <-- новое
+  if (m) {
+    const y = +m[1], mo = +m[2];
+    const s = new Date(Date.UTC(y, mo-1, 1));
+    const e = new Date(Date.UTC(y, mo, 0));
+    const iso = (d: Date) => d.toISOString().slice(0,10);
+    return [iso(s), iso(e)];
+  }
+  const y = /^(\d{4})$/.exec(p);
+  if (y) return [`${y[1]}-01-01`, `${y[1]}-12-31`];
   return ['2025-01-01', '2025-12-31'];
 };
 
@@ -186,13 +207,19 @@ const rawApi = createApi({
 const apiWithFlights = rawApi.injectEndpoints({
   endpoints: (build) => ({
     getFlights: build.query<FlightRow[], { period: string; regionCodes?: string[] }>({
-      serializeQueryArgs: ({ queryArgs }) => queryArgs.period,
+      serializeQueryArgs: ({ queryArgs }) => 
+        JSON.stringify([queryArgs.period, (queryArgs.regionCodes ?? []).join(',')]),
       keepUnusedDataFor: 600,
       async queryFn({ period, regionCodes }, _api, _extra, bq) {
         const bound = bq as BoundBQ;
         const [from, to] = periodToRange(period);
-        const params: Record<string, any> = { datefrom: from, dateto: to };
-        if (regionCodes?.length) params['regions'] = regionCodes;
+        const params: Record<string, any> = { date_from: from, date_to: to };
+        if (regionCodes?.length === 1) {
+          const regions = await getRegionsCached(_api);
+          const byCode = new Map(regions.map(r => [r.code, Number(r.id)]));
+          const rid = byCode.get(z2(regionCodes[0]));
+          if (rid) params.region_id = rid;
+        }
         const cacheKey = `flights:${from}:${to}:${(regionCodes ?? []).join(',')}`;
 
         const fetchPages = async (url: string) =>
@@ -221,6 +248,24 @@ const apiWithFlights = rawApi.injectEndpoints({
 const apiWithRefs = apiWithFlights.injectEndpoints({
   endpoints: (build) => ({
 
+    getRegionStatistics: build.query<RegionStatistics, { regionCode: string }>({
+      async queryFn({ regionCode }, _api, _extra, bq) {
+        const regions = await getRegionsCached(_api);
+        const byCode = new Map(regions.map(r => [z2(r.code ?? r.id), Number(r.id)]));
+        const rid = byCode.get(z2(regionCode));
+        if (!rid) {
+          return { error: { status: 400, data: 'Unknown region code' } as any };
+        }
+    
+        const r = await (bq as BoundBQ)(`/statistics/region/${rid}`);
+        if ('error' in r && r.error) return { error: r.error as FetchBaseQueryError };
+    
+        const body: any = (r as any).data ?? r;
+        return { data: body as RegionStatistics };
+      },
+      keepUnusedDataFor: 3600,
+    }),
+    
     getRegions: build.query<RegionRow[], void>({
       async queryFn(_arg, _api, _extra, bq) {
         const r = await tryMany(bq as BoundBQ, ['/region', '/regions']);
@@ -437,4 +482,5 @@ export const {
   useGetRatingQuery,
   useGetRankQuery,
   useGetInsightQuery,
+  useGetRegionStatisticsQuery,
 } = lctApi;

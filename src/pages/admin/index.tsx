@@ -6,7 +6,7 @@ export const AdminPage: React.FC = () => {
   const [users, setUsers] = React.useState<any[]>([])
   React.useEffect(()=>{ fetch('/api/admin/users').then(r=>r.json()).then(setUsers) }, [])
   return (
-    <RoleGuard allow={['admin','superadmin']}>
+    <RoleGuard allow={['admin']}>
       <div className="max-w-4xl mx-auto p-4 space-y-4">
         <h1 className="text-2xl font-bold">Администрирование</h1>
         <Card>
