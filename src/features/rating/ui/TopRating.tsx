@@ -24,11 +24,11 @@ export default function TopRating({ data, metric = 'count', period = '2025-Q3', 
   const rest = top.slice(3, 10);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="grid grid-cols-3 gap-3">
         {first3.map((r, i) => (
-          <Card key={r.code} className="text-center bg-slate-50">
-            <CardContent className="p-4">
+          <Card key={r.code} className="text-center bg-slate-50 border-none rounded-2xl">
+            <CardContent className="p-4 bg-slate-200 rounded-2xl h-full">
               <div className="text-slate-500 text-sm">{r.name}</div>
               <div className="text-3xl font-semibold mt-1">{i + 1}</div>
               <div className="text-xs text-slate-500 mt-1">
