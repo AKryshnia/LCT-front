@@ -3,6 +3,7 @@ import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getRegionName } from '@/shared/constants/regions';
 import { loadGeoJson } from '@/shared/lib/geoJsonLoader';
+import { GEO_URL } from '@/shared/constants/geo';
 
 type RegionStat = { code: string; value: number; name?: string };
 type Props = {
@@ -99,7 +100,7 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
     map.createPane('outline'); map.getPane('outline')!.style.zIndex = '500';
 
     // REGIONS
-    loadGeoJson('regions-simplified.patched.geojson')
+    loadGeoJson(GEO_URL)
       .then((geo) => {
         if (!geo) return;
         const regions = L.geoJSON(geo, {
@@ -147,7 +148,7 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
       regionsLayerRef.current = null;
       outlineRef.current = null;
     };
-  }, [onSelect, byCode]);
+  }, [onSelect]);
 
   // Перекраска при приходе новых значений: обновляем градиенты и stroke (без пересоздания слоя)
   useEffect(() => {

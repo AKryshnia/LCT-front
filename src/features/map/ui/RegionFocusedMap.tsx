@@ -56,7 +56,8 @@ export default function RegionFocusedMap({ regionCode, height = 700 }: Props) {
         const center = b.getCenter();
         const marker = L.circleMarker(center, { radius: 5, color: '#1f2937', fillColor: '#22c55e', fillOpacity: 0.9 }).addTo(map);
         marker.bindTooltip(`Регион ${regionCode}`, { permanent: false, direction: 'top' });
-      });
+      })
+      .catch(console.error);
   }, [regionCode]);
 
   return (

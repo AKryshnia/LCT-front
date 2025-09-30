@@ -19,9 +19,13 @@ export type FeatureCollection = {
   
     // Стартуем один общий промис и кладём его в inflight ДО await
     const job = (async () => {
-      const res = await fetch(url, { cache: 'force-cache' }); // браузерный кеш тоже используем
+      const res = await fetch(url, { cache: 'force-cache' });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      const json = (await res.json()) as FeatureCollection;
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('json')) {
+        throw new Error(`Unexpected content-type for ${url}: ${ct}`);
+      }
+      const json = await res.json() as FeatureCollection;
       dataCache.set(url, json);
       inflight.delete(url);
       return json;
