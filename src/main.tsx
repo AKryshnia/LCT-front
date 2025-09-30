@@ -38,7 +38,8 @@ const router = createBrowserRouter([
   { 
     path: '/uploads', 
     element: (
-      <ProtectedRoute roles={['operator', 'analyst', 'admin']}>
+      //<ProtectedRoute roles={['operator', 'analyst', 'admin']}>
+      <ProtectedRoute roles={['admin']}>
         <AppShell><UploadsPage /></AppShell>
       </ProtectedRoute>
     )
