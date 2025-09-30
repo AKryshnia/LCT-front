@@ -16,7 +16,7 @@ const args = Object.fromEntries(
 // settings
 const API = args.api || process.env.VITE_API_URL || 'http://ltc.kagafonov.beget.tech:8100';
 const SRC = args.src || '';
-const OUT = args.out || path.resolve(__dirname, '../public/regions-simplified.geojson');
+const OUT = args.out || path.resolve(__dirname, '../public/regions-simplified.patched.geojson');
 const SIMPLIFY = args.simplify || '15%';
 const PRECISION = Number(args.precision || 5);
 
