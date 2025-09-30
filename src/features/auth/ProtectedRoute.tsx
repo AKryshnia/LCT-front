@@ -13,9 +13,7 @@ export const ProtectedRoute: React.FC<Props> = ({ children, roles }) => {
   const { isAuthed, roles: userRoles } = useSelector((s: RootState) => s.auth);
 
   // Если не авторизован, редирект на /login
-  if (!isAuthed) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!isAuthed) return <Navigate to="/login" replace />;
 
   // Если указаны требуемые роли, проверяем доступ
   if (roles && roles.length > 0) {
