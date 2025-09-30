@@ -2,11 +2,12 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
-  useGetKpiQuery,
   useGetRankQuery,
   useGetRegionsQuery,
+  useGetRegionStatisticsQuery,
 } from '@/shared/api/lctApi';
 import { getRegionName } from '@/shared/constants/regions';
+import KpiTiles from '@/widgets/kpi/KpiTiles';
 
 type Props = {
   code: string;   // "77"
@@ -14,25 +15,23 @@ type Props = {
 };
 
 export default function RegionCard({ code, period }: Props) {
-  const metric = 'count'; // единственная метрика на MVP
   const fallbackName = getRegionName(code);
 
   // Справочник регионов
   const { data: regions, isLoading: isLoadingRegions } = useGetRegionsQuery();
 
-  // KPI data for the region
-  const { data: kpi, isLoading: isLoadingKpi } = useGetKpiQuery({ 
-    period, 
-    metric, 
-    region: code 
+  // Серверная статистика региона (заменяет клиентский KPI)
+  const { data: stats, isLoading: isLoadingStats } = useGetRegionStatisticsQuery({
+    regionCode: code,
   });
 
   // Rank data for the region
-  const { data: rank, isLoading: isLoadingRank } = useGetRankQuery({ 
-    period, 
-    metric, 
-    region: code 
+  const { data: rank, isLoading: isLoadingRank } = useGetRankQuery({
+    period,
+    metric: 'count',
+    region: code,
   });
+
   const regionFromApi = React.useMemo(
     () => (regions ?? []).find((r) => String(r.code) === String(code)),
     [regions, code]
@@ -54,7 +53,23 @@ export default function RegionCard({ code, period }: Props) {
     return undefined;
   }, [regionFromApi?.population]);
 
-  const loading = isLoadingRegions || isLoadingKpi || isLoadingRank;
+  const loading = isLoadingRegions || isLoadingStats || isLoadingRank;
+
+  // KPI из серверной статистики:
+  // totalFlights — прямо из summary
+  // avgDurationMin — взвешенная средняя по годам, где avg_flight_time приходит в часах → переводим в минуты
+  const totalFlights = stats?.summary?.total_flights ?? 0;
+  const avgDurationMin = React.useMemo(() => {
+    const byYear = stats?.statistics?.by_year ?? [];
+    if (!byYear.length) return 0;
+    const flightsSum = byYear.reduce((s, y) => s + (y.flight_count ?? 0), 0);
+    if (!flightsSum) return 0;
+    const durationHoursWeighted = byYear.reduce(
+      (s, y) => s + (y.avg_flight_time ?? 0) * (y.flight_count ?? 0),
+      0
+    );
+    return Math.round((durationHoursWeighted / flightsSum) * 60); // в минуты
+  }, [stats?.statistics?.by_year]);
 
   return (
     <Card className="shadow-xl">
@@ -92,16 +107,16 @@ export default function RegionCard({ code, period }: Props) {
           </div>
         )}
 
-        {/* Краткая сводка по БВС (из KPI) */}
+        {/* Краткая сводка по БВС (из server-side statistics) */}
         <div className="rounded-xl border p-3">
           <div className="text-slate-500 text-xs">Полёты БВС за период</div>
           <div className="mt-1 text-base">
             <span className="font-semibold tabular-nums">
-              {kpi?.totalFlights != null ? kpi.totalFlights.toLocaleString('ru-RU') : '—'}
+              {totalFlights ? totalFlights.toLocaleString('ru-RU') : '—'}
             </span>{' '}
             полётов, средняя длительность —{' '}
             <span className="tabular-nums font-semibold">
-              {kpi?.avgDurationMin != null ? Math.round(kpi.avgDurationMin) : '—'}
+              {avgDurationMin || '—'}
             </span>{' '}
             мин
           </div>

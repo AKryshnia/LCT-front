@@ -1,14 +1,15 @@
+// src/widgets/kpi/KpiTiles.tsx
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { useGetKpiQuery } from '@/shared/api/lctApi';
+import { useGetKpiQuery, useGetTimeseriesQuery } from '@/shared/api/lctApi';
 
 type Props =
   | {
       /** если передать числа — хук не дергаем */
       totalFlights: number;
       avgDurationMin: number;
-      growthPct: number;
-      dailyAvg: number;
+      growthPct: number; // %, уже посчитан на странице
+      dailyAvg: number;  // среднесуточное, уже посчитано на странице
       region?: string;
       period?: string;
     }
@@ -23,6 +24,7 @@ type Props =
     };
 
 export default function KpiTiles(props: Props) {
+  // если хотя бы одно из чисел не передано — переходим в «неконтролируемый» режим
   const needFetch =
     props.totalFlights === undefined ||
     props.avgDurationMin === undefined ||
@@ -32,42 +34,78 @@ export default function KpiTiles(props: Props) {
   const region = ('region' in props && props.region) || 'RU';
   const period = ('period' in props && props.period) || '2025-Q3';
 
-  const { data } = useGetKpiQuery({ period, region, metric: 'count' }, { skip: !needFetch });
+  // KPI (totalFlights, avgDurationMin, ratio)
+  const { data: kpiData } = useGetKpiQuery(
+    { period, region, metric: 'count' },
+    { skip: !needFetch }
+  );
 
-  const totalFlights = needFetch ? data?.totalFlights ?? 0 : (props as any).totalFlights;
-  const avgDurationMin = needFetch ? data?.avgDurationMin ?? 0 : (props as any).avgDurationMin;
-  const growthPct = needFetch ? data?.ratio ?? 0 : (props as any).growthPct;
-  const dailyAvg = needFetch ? data?.peakHour ?? 0 : (props as any).dailyAvg;
+  // Таймсерия: нужна только чтобы честно посчитать среднесуточное значение
+  const { data: tsData } = useGetTimeseriesQuery(
+    { period, metric: 'count', region },
+    { skip: !needFetch }
+  );
+
+  // контролируемые значения приходят из props; иначе берём из API
+  const totalFlights = needFetch
+    ? Number(kpiData?.totalFlights ?? 0)
+    : Number((props as any).totalFlights);
+
+  const avgDurationMin = needFetch
+    ? Math.round(Number(kpiData?.avgDurationMin ?? 0))
+    : Math.round(Number((props as any).avgDurationMin ?? 0));
+
+  const growthPct = needFetch
+    ? Math.round(Number(kpiData?.ratio ?? 0))
+    : Math.round(Number((props as any).growthPct ?? 0));
+
+  // Среднесуточное: если контролируемый режим — берём из props;
+  // иначе считаем по таймсерии (сумма значений / число дней)
+  const dailyAvgAuto = React.useMemo(() => {
+    if (!tsData || !Array.isArray(tsData) || tsData.length === 0) return 0;
+    const sum = tsData.reduce((s, p) => s + Number(p?.value ?? 0), 0);
+    return Math.round(sum / tsData.length);
+  }, [tsData]);
+
+  const dailyAvg = needFetch
+    ? dailyAvgAuto
+    : Number((props as any).dailyAvg ?? 0);
 
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Card className="bg-muted">
+      <Card className="bg-transparent">
         <CardContent className="p-4">
-          <div className="text-slate-500 text-sm">Общее число полетов</div>
           <div className="text-3xl font-semibold tabular-nums mt-1">
-            {Number(totalFlights).toLocaleString('ru-RU')}
+            {totalFlights.toLocaleString('ru-RU')}
           </div>
+          <div className="text-slate-500 text-md">Общее число полетов</div>
         </CardContent>
       </Card>
+
       <Card>
         <CardContent className="p-4">
-          <div className="text-slate-500 text-sm">Среднее время</div>
-          <div className="text-3xl font-semibold tabular-nums mt-1">{avgDurationMin}</div>
-          <div className="text-slate-500 text-xs mt-1">мин</div>
+          <div className="text-3xl font-semibold tabular-nums mt-1">
+            {avgDurationMin} <span className="text-slate-500 text-xs">мин</span>
+          </div>
+          <div className="text-slate-500 text-md">Среднее время</div>
         </CardContent>
       </Card>
+
       <Card>
         <CardContent className="p-4">
-          <div className="text-slate-500 text-sm">Соотношение роста к падению</div>
-          <div className="text-3xl font-semibold tabular-nums mt-1">{growthPct}%</div>
+          <div className="text-3xl font-semibold tabular-nums mt-1">
+            {growthPct}%
+          </div>
+          <div className="text-slate-500 text-md">Соотношение роста к падению</div>
         </CardContent>
       </Card>
+
       <Card className="bg-foreground text-background">
         <CardContent className="p-4">
-          <div className="text-sm opacity-80">Среднесуточная статистика</div>
           <div className="text-3xl font-semibold tabular-nums mt-1">
-            {Number(dailyAvg).toLocaleString('ru-RU')}
+            {dailyAvg.toLocaleString('ru-RU')}
           </div>
+          <div className="text-slate-100 text-md">Среднесуточная статистика</div>
         </CardContent>
       </Card>
     </div>

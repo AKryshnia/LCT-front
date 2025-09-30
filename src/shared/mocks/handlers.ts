@@ -184,7 +184,7 @@ let uploads: any[] = [
 
 export const auxHandlers = [
   http.get('/api/admin/users', async () =>
-    HttpResponse.json([{ id: 1, name: 'Demo SuperAdmin', roles: ['superadmin', 'admin', 'analyst', 'operator'] }]),
+    HttpResponse.json([{ id: 1, name: 'Demo User', roles: ['admin', 'analyst', 'operator'] }]),
   ),
 
   http.get('/api/uploads', async () => {

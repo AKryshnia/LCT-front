@@ -1,10 +1,9 @@
 import React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   useGetRegionsQuery,
-  useGetKpiQuery,
-  useGetTimeseriesQuery,
+  useGetRegionStatisticsQuery,
   useGetRankQuery,
 } from '@/shared/api/lctApi';
 import AreaTrend from '@/widgets/charts/AreaTrend';
@@ -12,13 +11,40 @@ import KpiTiles from '@/widgets/kpi/KpiTiles';
 
 export const RegionPage: React.FC = () => {
   const { code = '01' } = useParams();
-  const period = '2025-Q3';
+  const [searchParams] = useSearchParams();
+  const period = searchParams.get('period') || '2025-Q3';
 
   const { data: regions } = useGetRegionsQuery();
   const meta = regions?.find((r) => r.code === code);
 
-  const { data: kpi } = useGetKpiQuery({ region: code, period, metric: 'count' });
-  const { data: series } = useGetTimeseriesQuery({ region: code, period, metric: 'count' });
+  const { data: stats } = useGetRegionStatisticsQuery({ regionCode: code });
+  // KPI из summary и by_year (взвешенная средняя длительность по годам)
+  const totalFlights = stats?.summary?.total_flights ?? 0;
+  const weeksCovered = stats?.summary?.weeks_covered ?? 0;
+  const byYear = stats?.statistics?.by_year ?? [];
+  const { avgDurationMin, growthPct, dailyAvg } = (() => {
+    if (!byYear.length) return { avgDurationMin: 0, growthPct: 0, dailyAvg: 0 };
+    const totalFlightsAll = byYear.reduce((s, y) => s + (y.flight_count ?? 0), 0);
+    const totalDurationAll = byYear.reduce((s, y) => s + (y.avg_flight_time ?? 0) * (y.flight_count ?? 0), 0);
+    const avg = totalFlightsAll ? Math.round((totalDurationAll / totalFlightsAll) * 60) : 0;
+    const sorted = [...byYear].sort((a, b) => a.year - b.year);
+    const last = sorted[sorted.length - 1];
+    const prev = sorted[sorted.length - 2];
+    const yoy = prev?.flight_count ? Math.round(((last.flight_count - prev.flight_count) / prev.flight_count) * 100) : 0;
+    const dAvg = weeksCovered ? Math.round((totalFlights ?? 0) / (weeksCovered * 7)) : 0;
+    return { avgDurationMin: avg, growthPct: yoy, dailyAvg: dAvg };
+  })();
+  // Ряд для графика из by_year_and_month (берем последний доступный год)
+  const byYm = stats?.statistics?.by_year_and_month ?? [];
+  const sortedByYm = [...byYm].sort((a, b) => a.year - b.year);
+  let series: { date: string; value: number }[] = [];
+  if (sortedByYm.length) {
+    const latest = sortedByYm[sortedByYm.length - 1];
+    series = latest.months.map((m) => ({
+      date: `${latest.year}-${String(m.month).padStart(2, '0')}-01`,
+      value: Number(m.flight_count ?? 0),
+    }));
+  }
   const { data: rank } = useGetRankQuery({ region: code, period, metric: 'count' });
 
   return (
@@ -49,7 +75,12 @@ export const RegionPage: React.FC = () => {
                 <li>
                   Население:{' '}
                   <span className="tabular-nums">
-                    {meta?.population ? Number(meta.population).toLocaleString('ru-RU') : '—'}
+                  {meta?.population
+                    ? (typeof meta.population === 'number'
+                        ? meta.population
+                        : Number(String(meta.population).replace(/\s/g, '').replace(',', '.'))
+                      ).toLocaleString('ru-RU')
+                    : '—'}
                   </span>
                 </li>
                 <li>
@@ -73,10 +104,12 @@ export const RegionPage: React.FC = () => {
           </CardHeader>
           <CardContent>
           <KpiTiles
-            totalFlights={kpi?.totalFlights ?? 0}
-            avgDurationMin={kpi?.avgDurationMin ?? 0}
-            growthPct={kpi?.ratio ?? 0}
-            dailyAvg={kpi?.peakHour ?? 0}
+            totalFlights={totalFlights}
+            avgDurationMin={avgDurationMin}
+            growthPct={growthPct}
+            dailyAvg={dailyAvg}
+            region={code}
+            period={period}
           />
           </CardContent>
         </Card>
@@ -89,7 +122,7 @@ export const RegionPage: React.FC = () => {
           <CardContent>
             <AreaTrend
               data={(series ?? []).map((p: any) => ({
-                t: p.date?.slice(-2) ?? '',
+                t: String(p.date ?? '').slice(-2), // "01".."12"
                 v: Number(p.value),
               }))}
             />
