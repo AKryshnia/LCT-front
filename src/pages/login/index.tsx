@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 
 const LoginPage: React.FC = () => {
   const [name, setName] = useState('');
-  const [selectedRole, setSelectedRole] = useState<Role>('operator');
+  const [selectedRole, setSelectedRole] = useState<Role>('admin');
   const dispatch = useDispatch();
   const navigate = useNavigate();
 

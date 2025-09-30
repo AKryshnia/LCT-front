@@ -1,7 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { getAuth, setAuth, clearAuth } from '@/shared/auth/localAuth';
 
-export type Role = 'operator' | 'analyst' | 'admin';
+//export type Role = 'operator' | 'analyst' | 'admin';
+export type Role = 'admin';
 
 type State = {
   isAuthed: boolean;
