@@ -35,6 +35,7 @@ import ExportDialog from '@/features/export/ui/ExportDialog';
 
 type PeriodMode = 'all' | 'year' | 'quarter' | 'month';
 
+
 /* ───────────────── helpers: диапазон дат под выбранный период ───────────────── */
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -69,6 +70,36 @@ function periodToRange(mode: PeriodMode, apiPeriod: string) {
   const today = new Date();
   const Y = today.getFullYear();
   return { from: `${Y}-01-01`, to: `${Y}-12-31`, granularity: 'month' as const };
+}
+
+function prevUiPeriod(apiPeriod: string) {
+  // YYYY-MM
+  if (/^\d{4}-\d{2}$/.test(apiPeriod)) {
+    const [y, m] = apiPeriod.split('-').map(Number);
+    const d = new Date(y, m - 1, 1);
+    d.setMonth(d.getMonth() - 1);
+    const yy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${yy}-${mm}`;
+  }
+  // YYYY-Qn
+  if (/^\d{4}-Q[1-4]$/.test(apiPeriod)) {
+    const [yStr, qStr] = apiPeriod.split('-Q');
+    let y = Number(yStr), q = Number(qStr) - 1;
+    if (q === 0) { q = 4; y -= 1; }
+    return `${y}-Q${q}`;
+  }
+  // range:YYYY-MM-DD..YYYY-MM-DD  → сдвигаем назад на ту же длину
+  const m = /^range:(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/.exec(apiPeriod);
+  if (m) {
+    const from = new Date(m[1]), to = new Date(m[2]);
+    const span = (to.getTime() - from.getTime()) / 86400000 + 1; // дней
+    const prevTo = new Date(from); prevTo.setDate(prevTo.getDate() - 1);
+    const prevFrom = new Date(prevTo); prevFrom.setDate(prevTo.getDate() - (span - 1));
+    const iso = (d: Date) => d.toISOString().slice(0,10);
+    return `range:${iso(prevFrom)}..${iso(prevTo)}`;
+  }
+  return apiPeriod; // fallback
 }
 
 
@@ -145,6 +176,21 @@ export default function DashboardPage() {
     period: apiPeriod,
     region: selectedRegion ?? 'RU',
   });
+
+  const prevPeriod = React.useMemo(() => prevUiPeriod(apiPeriod), [apiPeriod]);
+
+  const { data: prevRank } = useGetRankQuery({
+    metric: 'count',
+    period: prevPeriod,
+    region: selectedRegion ?? 'RU',
+  }, { skip: !selectedRegion }); // запрашиваем только когда выбран регион
+
+  const trend = React.useMemo(() => {
+    const cur = rank?.rank, prev = prevRank?.rank;
+    if (typeof cur !== 'number' || typeof prev !== 'number') return null;
+    // Меньшее число = лучше позиция
+    return prev - cur; // >0 улучшение, <0 ухудшение
+  }, [rank?.rank, prevRank?.rank]);
 
   /* ───── Timeseries via flights: период → диапазон дат, агрегация на фронте ───── */
 
@@ -280,25 +326,59 @@ export default function DashboardPage() {
 
   /* ───── разрез фона: верх белый, низ (с KPI) серый ───── */
 
-  const rootRef = React.useRef<HTMLDivElement | null>(null);
   const splitRef = React.useRef<HTMLDivElement | null>(null);
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const cardColRef = React.useRef<HTMLDivElement | null>(null);
+  const padRef = React.useRef<HTMLDivElement | null>(null);
+  const [cardLeft, setCardLeft] = React.useState<number | null>(null);
   const [whiteHeight, setWhiteHeight] = React.useState(0);
 
   const measure = React.useCallback(() => {
     if (!rootRef.current || !splitRef.current) return;
-    const rootTop = rootRef.current.getBoundingClientRect().top;
+    const rootTop   = rootRef.current.getBoundingClientRect().top;
     const anchorTop = splitRef.current.getBoundingClientRect().top;
-    setWhiteHeight(Math.max(0, Math.round(anchorTop - rootTop)));
+    setWhiteHeight(Math.max(0, anchorTop - rootTop));
+  }, []);
+
+  const measureCardLeft = React.useCallback(() => {
+    if (!rootRef.current || !cardColRef.current) return;
+    const rootBox = rootRef.current.getBoundingClientRect();
+    const cardBox = cardColRef.current.getBoundingClientRect();
+    // левый край колонки карточки относительно root
+    const leftInsideRoot = cardBox.left - rootBox.left;
+    setCardLeft(leftInsideRoot);
   }, []);
 
   React.useLayoutEffect(() => {
-    measure();
-    const onResize = () => measure();
+    measureCardLeft();
+    const onResize = () => measureCardLeft();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, [measure]);
+  }, [measureCardLeft]);
+  
+  React.useEffect(() => {
+    measureCardLeft();
+  }, [selectedRegion, measureCardLeft]);
 
   React.useEffect(() => { measure(); }, [insight, regions, periodMode, selectedRegion]);
+
+  //
+  React.useEffect(() => {
+    const id = requestAnimationFrame(measureCardLeft);
+    return () => cancelAnimationFrame(id);
+  }, [selectedRegion, measureCardLeft]);
+
+  const [isXL, setIsXL] = React.useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1280px)').matches : false
+  );
+  
+  React.useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1280px)');
+    const onChange = (e: MediaQueryListEvent) => setIsXL(e.matches);
+    setIsXL(mq.matches);
+    mq.addEventListener?.('change', onChange);
+    return () => mq.removeEventListener?.('change', onChange);
+  }, []);
 
   function RankOverlay({ rank }: { rank: number | null }) {
     return (
@@ -327,147 +407,203 @@ export default function DashboardPage() {
     );
   }
   
+  function RegionRankBadge({
+    rank,
+    trend,
+  }: { rank?: number | null; trend: number | null }) {
+    const color =
+      trend == null ? 'text-slate-700'
+      : trend > 0   ? 'text-emerald-600'
+      : trend < 0   ? 'text-rose-600'
+      : 'text-slate-700';
+  
+    const chipBg =
+      trend == null ? 'bg-slate-100 text-slate-700'
+      : trend > 0   ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+      : trend < 0   ? 'bg-rose-50 text-rose-700 border border-rose-100'
+      : 'bg-slate-100 text-slate-700';
+  
+    const arrow = trend == null ? '' : trend > 0 ? '▲' : trend < 0 ? '▼' : '•';
+  
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <div className={`text-3xl font-semibold tabular-nums ${color}`}>
+            {typeof rank === 'number' ? rank : '—'}
+          </div>
+          {trend != null && (
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${chipBg}`}>
+              {arrow} {trend > 0 ? `+${trend}` : trend < 0 ? `${trend}` : '0'}
+            </span>
+          )}
+        </div>
+        {/*<div className="text-xs text-slate-500">
+          {trend == null ? 'Нет данных для сравнения'
+           : trend > 0 ? 'Позиция улучшилась'
+           : trend < 0 ? 'Позиция ухудшилась'
+           : 'Без изменений'}
+        </div>*/}
+      </div>
+    );
+  }
+  
   /* ────────────────────────────────────────────────────────────────────────────── */
 
   return (
-    <div ref={rootRef} className="relative isolate px-6 py-5 min-h-screen bg-slate-50 overflow-x-hidden">
+    <div ref={rootRef} className="relative isolate min-h-screen bg-slate-50 overflow-x-hidden">
+      {/* фон карточки, тянется вверх/вниз/вправо до краёв экрана */}
+      {selectedRegion && cardLeft != null && (
+        <div
+          aria-hidden
+          className="absolute top-0 bottom-0 right-0 z-0 pointer-events-none bg-slate-50"
+          style={{ left: `${cardLeft - 1}px` }}
+        />
+      )}
       {/* full-bleed белый фон до «Динамика полётов» */}
       <div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 -translate-x-1/2 w-screen top-0 z-0 bg-white"
-        style={{ height: whiteHeight }}
+        className="absolute top-0 left-0 z-0 bg-white"
+        style={{ height: whiteHeight, width: Math.max(0, (cardLeft ?? 0) - 1) }}
       />
+      <div ref={padRef} className="relative z-10 px-6 py-5">
 
-      <div className="relative z-10 grid grid-cols-12 gap-4">
-        {/* Левая колонка */}
-        <aside className="col-span-12 xl:col-span-4 space-y-4 xl:order-1">
-          {/* Region + Period */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Регион */}
-            <div className="flex flex-col gap-1">
-              <div className="text-base font-medium">Регион</div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="justify-between border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-100">
-                    {selectedRegion ? getRegionName(selectedRegion) : 'Россия'}
-                    <ChevronDown className="w-4 h-4 ml-2" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={() => setSelectedRegion(null)}>Россия</DropdownMenuItem>
-                  {(regions ?? []).slice(0, 10).map((r: any) => (
-                    <DropdownMenuItem key={r.code} onClick={() => setSelectedRegion(r.code)}>
-                      {r.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+        <div className="relative z-10 grid grid-cols-12 gap-4">
+          {/* Левая колонка */}
+          <aside className="col-span-12 xl:col-span-4 space-y-4 xl:order-1">
+            {/* Region + Period */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Регион */}
+              <div className="flex flex-col gap-1">
+                <div className="text-base font-medium">Регион</div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="justify-between border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-100">
+                      {selectedRegion ? getRegionName(selectedRegion) : 'Россия'}
+                      <ChevronDown className="w-4 h-4 ml-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={() => setSelectedRegion(null)}>Россия</DropdownMenuItem>
+                    {(regions ?? []).slice(0, 10).map((r: any) => (
+                      <DropdownMenuItem key={r.code} onClick={() => setSelectedRegion(r.code)}>
+                        {r.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Период */}
+              <div className="flex flex-col gap-1">
+                <div className="text-base font-medium">Период</div>
+                <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
+                  <SelectTrigger className="h-9 border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-100">
+                    <SelectValue placeholder="За квартал" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="quarter">За квартал</SelectItem>
+                    <SelectItem value="year">За год</SelectItem>
+                    <SelectItem value="month">За месяц</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Период */}
-            <div className="flex flex-col gap-1">
-              <div className="text-base font-medium">Период</div>
-              <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
-                <SelectTrigger className="h-9 border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-100">
-                  <SelectValue placeholder="За квартал" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="quarter">За квартал</SelectItem>
-                  <SelectItem value="year">За год</SelectItem>
-                  <SelectItem value="month">За месяц</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Инсайт */}
-          <Card className="border border-transparent shadow-none">
-            <CardContent className="p-4">
-              <div className="border-b border-slate-200 mb-4 -mr-10 -ml-10" />
-              <div className="text-xl font-semibold leading-snug">
-                {insight?.title ?? 'Регион N вошёл в топ-3 по росту активности'}
-              </div>
-              <div className="text-slate-600 mt-1">
-                {insight?.subtitle ?? 'Средняя длительность полётов БВС выросла на 25%'}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Рейтинг */}
-          <Card className="border border-slate-50 border-[1px] rounded-[16px] px-2 py-0 bg-slate-50 shadow-none">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-[20px]">Рейтинг регионов</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TopRating limit={3} metric="count" period={apiPeriod} />
-            </CardContent>
-          </Card>
-
-          {/* Якорь разреза фона — ниже серый фон */}
-          <div ref={splitRef} />
-
-          {/* KPI */}
-          <div className="space-y-2">
-            <div className="border-b border-slate-200 mb-4 -mr-10 -ml-6" />
-            <div className="text-base font-medium mb-2">Динамика полётов</div>
-            <KpiTiles region={selectedRegion ?? 'RU'} period={apiPeriod} />
-          </div>
-
-          {/* График */}
-          <Card className="bg-transparent">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">График</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 min-w-0">
-              <AreaTrend data={trendData} height={180} />
-              {/* {isFlightsLoading && <div className="h-[180px] animate-pulse bg-slate-100 rounded-xl" />} */}
-            </CardContent>
-          </Card>
-
-          {/* Последний полёт (демо) */}
-          <LastFlightCard period={apiPeriod} regionCode={selectedRegion ?? null} />
-
-          {/* Кнопки */}
-          <div className="grid grid-rows-2 justify-center">
-            <Button variant="ghost" className="w-full">Больше</Button>
-            <ExportDialog targetRef={rootRef} />
-          </div>
-        </aside>
-
-        {/* Правая зона: карта или регион */}
-        <div className={`col-span-12 ${selectedRegion ? 'xl:col-span-5' : 'xl:col-span-8'} space-y-3 xl:order-3`}>
-          {selectedRegion ? (
-            <>
-              <RegionFocusedMap regionCode={selectedRegion} />
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-600">Выбран регион {selectedRegion}</div>
-                <Button variant="outline" size="sm" onClick={() => setSelectedRegion(null)}>Вернуться к карте</Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <RussiaFlatMap
-                data={mapData}
-                selectedRegion={selectedRegion ?? undefined}
-                onSelect={(code) => setSelectedRegion(code)}
-                overlay={<RankOverlay rank={rank?.rank ?? null} />}
-              />
-              <div className="flex items-center gap-3">
-                <div className="text-sm text-slate-600">
-                  Место в рейтинге – {rank?.rank ?? '—'}
+            {/* Инсайт */}
+            <Card className="border border-transparent shadow-none">
+              <CardContent className="p-4">
+                <div className="border-b border-slate-200 mb-4 -mr-10 -ml-10" />
+                <div className="text-xl font-semibold leading-snug">
+                  {insight?.title ?? 'Регион N вошёл в топ-3 по росту активности'}
                 </div>
-                <div className="flex-1" />
-              </div>
-            </>
+                <div className="text-slate-600 mt-1">
+                  {insight?.subtitle ?? 'Средняя длительность полётов БВС выросла на 25%'}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Рейтинг */}
+            <Card className="border border-slate-50 border-[1px] rounded-[16px] px-2 py-0 bg-slate-50 shadow-none">
+              <CardHeader className="pb-2">
+                {selectedRegion
+                  ? <CardTitle className="text-[20px]">Рейтинг региона</CardTitle>
+                  : <CardTitle className="text-[20px]">Рейтинг регионов</CardTitle>
+                }
+              </CardHeader>
+              <CardContent>
+                {selectedRegion
+                  ? <RegionRankBadge rank={rank?.rank ?? null} trend={trend} />
+                  : <TopRating limit={3} metric="count" period={apiPeriod} />
+                }
+              </CardContent>
+            </Card>
+
+            {/* Якорь разреза фона — ниже серый фон */}
+            <div ref={splitRef} />
+
+            {/* KPI */}
+            <div className="space-y-2">
+              <div className="border-b border-slate-200 mb-4 -mr-10 -ml-6" />
+              <div className="text-base font-medium mb-2">Динамика полётов</div>
+              <KpiTiles region={selectedRegion ?? 'RU'} period={apiPeriod} />
+            </div>
+
+            {/* График */}
+            <Card className="bg-transparent">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">График</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 min-w-0">
+                <AreaTrend data={trendData} height={180} />
+                {/* {isFlightsLoading && <div className="h-[180px] animate-pulse bg-slate-100 rounded-xl" />} */}
+              </CardContent>
+            </Card>
+
+            {/* Последний полёт (демо) */}
+            <LastFlightCard period={apiPeriod} regionCode={selectedRegion ?? null} />
+
+            {/* Кнопки */}
+            <div className="grid grid-rows-2 justify-center">
+              <Button variant="ghost" className="w-full">Больше</Button>
+              <ExportDialog targetRef={rootRef} />
+            </div>
+          </aside>
+
+          {/* Правая зона: карта или регион */}
+          <div className={`col-span-12 ${selectedRegion ? 'xl:col-span-5' : 'xl:col-span-8'} space-y-3 xl:order-3`}>
+            {selectedRegion ? (
+              <>
+                <RegionFocusedMap regionCode={selectedRegion} />
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-slate-600">Выбран регион {selectedRegion}</div>
+                  <Button variant="outline" size="sm" onClick={() => setSelectedRegion(null)}>Вернуться к карте</Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <RussiaFlatMap
+                  data={mapData}
+                  selectedRegion={selectedRegion ?? undefined}
+                  onSelect={(code) => setSelectedRegion(code)}
+                  overlay={<RankOverlay rank={rank?.rank ?? null} />}
+                />
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-slate-600">
+                    Место в рейтинге – {rank?.rank ?? '—'}
+                  </div>
+                  <div className="flex-1" />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Карточка региона (когда выбран) */}
+          {selectedRegion && (
+            <div ref={cardColRef} className="col-span-12 xl:col-span-3 xl:order-2 z-20">
+              <RegionCard code={selectedRegion} period={apiPeriod} className="flex-1 min-h-[700px]" />
+            </div>
           )}
         </div>
-
-        {/* Карточка региона (когда выбран) */}
-        {selectedRegion && (
-          <div className="col-span-12 xl:col-span-3 xl:order-2">
-            <RegionCard code={selectedRegion} period={apiPeriod} />
-          </div>
-        )}
       </div>
     </div>
   );
