@@ -11,6 +11,7 @@ import { getRegionName } from '@/shared/constants/regions';
 type Props = {
   code: string;   // "77"
   period: string; // "2025" | "2025-Q3"
+  className?: string;
 };
 
 const fmt = (n?: number | null) =>
@@ -56,7 +57,7 @@ export default function RegionCard({ code, period }: Props) {
     null;
 
   return (
-    <Card className="bg-[#F3F5F8] border-0 shadow-none">
+    <Card className="h-full min-h-[680px] bg-slate-50 border-0 shadow-none ${className ?? ''}">
       <CardContent className="p-4 sm:p-5">
         {/* Header */}
         <div className="flex items-start justify-between">
