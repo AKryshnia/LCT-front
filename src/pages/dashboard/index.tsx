@@ -118,13 +118,13 @@ export default function DashboardPage() {
   const urlPeriod = searchParams.get('period') as PeriodMode | null;
 
   const [selectedRegion, setSelectedRegion] = React.useState<string | null>(urlRegion);
-  const [periodMode, setPeriodMode] = React.useState<PeriodMode>(urlPeriod || 'quarter');
+  const [periodMode, setPeriodMode] = React.useState<PeriodMode>(urlPeriod || 'year');
 
   // sync state → URL
   React.useEffect(() => {
     const params = new URLSearchParams();
     if (selectedRegion) params.set('region', selectedRegion);
-    if (periodMode && periodMode !== 'quarter') params.set('period', periodMode);
+    if (periodMode && periodMode !== 'year') params.set('period', periodMode);
     setSearchParams(params, { replace: true });
   }, [selectedRegion, periodMode, setSearchParams]);
 
@@ -459,12 +459,12 @@ export default function DashboardPage() {
           style={{ left: `${cardLeft - 1}px` }}
         />
       )}
-      {/* full-bleed белый фон до «Динамика полётов» */}
+      {/* full-bleed белый фон до «Динамика полётов»
       <div
         aria-hidden
         className="absolute top-0 left-0 z-0 bg-white"
         style={{ height: whiteHeight, width: Math.max(0, (cardLeft ?? 0) - 1) }}
-      />
+      /> */}
       <div ref={padRef} className="relative z-10 px-6 py-5">
 
         <div className="relative z-10 grid grid-cols-12 gap-4">
@@ -477,7 +477,7 @@ export default function DashboardPage() {
                 <div className="text-base font-medium">Регион</div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="justify-between border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-100">
+                    <Button variant="outline" className="justify-between border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-200">
                       {selectedRegion ? getRegionName(selectedRegion) : 'Россия'}
                       <ChevronDown className="w-4 h-4 ml-2" />
                     </Button>
@@ -497,7 +497,7 @@ export default function DashboardPage() {
               <div className="flex flex-col gap-1">
                 <div className="text-base font-medium">Период</div>
                 <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
-                  <SelectTrigger className="h-9 border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-100">
+                  <SelectTrigger className="h-9 border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-200">
                     <SelectValue placeholder="За квартал" />
                   </SelectTrigger>
                   <SelectContent>
@@ -510,10 +510,10 @@ export default function DashboardPage() {
             </div>
 
             {/* Инсайт */}
-            <Card className="border border-transparent shadow-none">
-              <CardContent className="p-4">
+            <Card className="border border-transparent shadow-none bg-transparent">
+              <CardContent className="p-4 bg-transparent">
                 <div className="border-b border-slate-200 mb-4 -mr-10 -ml-10" />
-                <div className="text-xl font-semibold leading-snug">
+                <div className="text-xl font-semibold leading-snug bg-transparent">
                   {insight?.title ?? 'Регион N вошёл в топ-3 по росту активности'}
                 </div>
                 <div className="text-slate-600 mt-1">
@@ -523,7 +523,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Рейтинг */}
-            <Card className="border border-slate-50 border-[1px] rounded-[16px] px-2 py-0 bg-slate-50 shadow-none">
+            <Card className="border border-slate-50 border-[1px] rounded-[16px] px-2 py-0 bg-white shadow-none">
               <CardHeader className="pb-2">
                 {selectedRegion
                   ? <CardTitle className="text-[20px]">Рейтинг региона</CardTitle>
