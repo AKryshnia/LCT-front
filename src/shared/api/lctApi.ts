@@ -70,6 +70,21 @@ export type RegionStatistics = {
   };
 };
 
+export type GetFlightsArgs = {
+  region_id?: number;           // если знаем id региона
+  region?: string | number;     // фолбэк: код региона (если так удобнее)
+  date_from?: string;           // YYYY-MM-DD
+  date_to?: string;             // YYYY-MM-DD
+  flight_type?: string;
+  page?: number;
+  per_page?: number;
+};
+
+export type Paginated<T> = {
+  data: T[];
+  links: Record<string, any>;
+  meta: Record<string, any>;
+};
 /* ===================== Утилиты ===================== */
 
 // запись подходит для серверной статистики?
@@ -175,6 +190,12 @@ const periodToRange = (p: string): [string, string] => {
 };
 
 /* ===================== Пэйджинг/кэш — ТОЛЬКО в getFlights ===================== */
+// какой вариант /flight поддерживает сервер: null — неизвестно
+let FLIGHT_STYLE: 'A' | 'B' | null = null;
+
+// единый ключ для кэша, независимый от названий параметров
+const makeRangeKey = (from: string, to: string, regionKey?: string | number | null) =>
+  `flights:${from}:${to}:${regionKey ?? ''}`;
 
 type BoundBQ = (args: string | FetchArgs) => Promise<{ data?: any; error?: FetchBaseQueryError }>;
 
@@ -308,7 +329,7 @@ const rawApi = createApi({
   baseQuery,
   refetchOnFocus: false,
   refetchOnReconnect: false,
-  keepUnusedDataFor: 600,
+  keepUnusedDataFor: 300,
   endpoints: () => ({}),
 });
 
@@ -326,8 +347,7 @@ const apiWithFlights = rawApi.injectEndpoints({
       async queryFn({ period, regionCodes }, _api, _extra, bq) {
         const bound = bq as BoundBQ;
         const [from, to] = periodToRange(period);
-
-        // сопоставляем код → ID (если один регион)
+      
         let regionIds: number[] | undefined;
         if (regionCodes?.length) {
           const regions = await getRegionsCached(_api);
@@ -336,34 +356,87 @@ const apiWithFlights = rawApi.injectEndpoints({
             .map(c => byCode.get(z2(c)))
             .filter((x): x is number => Number.isFinite(x));
         }
-
-        const variants = buildFlightParamVariants(from, to, regionIds);
-        // ключи кэша и дедупа — по диапазону
-        const cacheKeyBase = `flights:${from}:${to}:${(regionIds ?? []).join(',')}`;
-
-        const fetchWith = async (params: Record<string, any>) =>
-          fetchAllPagesSmart(bound, '/flight', params, `${cacheKeyBase}:${Object.keys(params).sort().join('|')}`);
-
-        const inDate = (f: any) => {
+        const inRangeAndRegion = (f: any) => {
           const d = String(f?.dof ?? '').slice(0, 10);
-          return /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= from && d <= to;
+          const inDate =
+            /^\d{4}-\d{2}-\d{2}$/.test(d) &&
+            d >= from &&
+            d <= to;
+          const inRegion =
+            !regionIds?.length || regionIds.includes(Number(f?.region_id));
+          return inDate && inRegion;
         };
-        const inRegion = (f: any) =>
-          !regionIds?.length || regionIds.includes(Number(f?.region_id));
-
+        const variants = buildFlightParamVariants(from, to, regionIds);
+        const cacheKey = makeRangeKey(from, to, (regionIds ?? []).join(',') || null);
+      
+        const tryAFirst = FLIGHT_STYLE !== 'B';
+      
         try {
-          // вариант A
-          try {
-            const all = await fetchWith(variants[0]);
-            const filtered = (all as any[]).filter(inRegion).filter(inDate);
-            return { data: filtered as FlightRow[] };
-          } catch {
-            // вариант B
-            const all = await fetchWith(variants[1]);
-            const filtered = (all as any[]).filter(inRegion).filter(inDate);
+          if (tryAFirst) {
+            const all = await fetchAllPagesSmart(bound, '/flight', variants[0], cacheKey);
+            FLIGHT_STYLE = 'A';
+            const filtered = (all as any[]).filter(inRangeAndRegion);
             return { data: filtered as FlightRow[] };
           }
+        } catch (_) { /* падаем на B */ }
+      
+        try {
+          const all = await fetchAllPagesSmart(bound, '/flight', variants[1], cacheKey);
+          FLIGHT_STYLE = 'B';
+          const filtered = (all as any[]).filter(inRangeAndRegion);
+          return { data: filtered as FlightRow[] };
         } catch (e) {
+          if (FLIGHT_STYLE === 'A') {
+            const all = await fetchAllPagesSmart(bound, '/flight', variants[0], cacheKey);
+            const filtered = (all as any[]).filter(inRangeAndRegion);
+            return { data: filtered as FlightRow[] };
+          }
+          return { error: e as FetchBaseQueryError };
+        }
+      },
+    }),
+
+    getFlightsRange: build.query<
+      FlightRow[],
+      { date_from: string; date_to: string; region_id?: number; region?: string | number; per_page?: number }
+    >({
+      serializeQueryArgs: ({ queryArgs }) => JSON.stringify(queryArgs),
+      keepUnusedDataFor: 600,
+      async queryFn(args, _api, _extra, bq) {
+        const bound = bq as BoundBQ;
+        const { date_from, date_to, region_id, region, per_page } = args;
+      
+        const a: Record<string, any> = { date_from, date_to };
+        if (per_page) a.per_page = per_page;
+        if (region_id != null) a.region_id = region_id;
+        if (region != null) a.region = region;
+      
+        const b: Record<string, any> = { datefrom: date_from, dateto: date_to };
+        if (region_id != null) b['regions[]'] = [region_id];
+      
+        // единый ключ кэша для обоих вариантов
+        const cacheKey = makeRangeKey(date_from, date_to, region_id ?? region ?? null);
+      
+        // 1) если уже знаем стиль - пробуем его первым
+        const tryAFirst = FLIGHT_STYLE !== 'B';
+        try {
+          if (tryAFirst) {
+            const resA = await fetchAllPagesSmart(bound, '/flight', a, cacheKey);
+            FLIGHT_STYLE = 'A';
+            return { data: resA as FlightRow[] };
+          }
+        } catch (_) { /* падаем на B */ }
+      
+        try {
+          const resB = await fetchAllPagesSmart(bound, '/flight', b, cacheKey);
+          FLIGHT_STYLE = 'B';
+          return { data: resB as FlightRow[] };
+        } catch (e) {
+          // последняя попытка: если знали A — попробуем всё-таки A (на случай временной ошибки)
+          if (FLIGHT_STYLE === 'A') {
+            const resA = await fetchAllPagesSmart(bound, '/flight', a, cacheKey);
+            return { data: resA as FlightRow[] };
+          }
           return { error: e as FetchBaseQueryError };
         }
       },
@@ -694,53 +767,62 @@ const apiWithAnalyticsCore = apiWithRefs.injectEndpoints({
     }),
 
     getKpi: build.query<Kpi, { period: string; metric: string; region?: string }>({
+      serializeQueryArgs: ({ queryArgs }) => {
+        const [from, to] = periodToRange(queryArgs.period);
+        const r = queryArgs.region && queryArgs.region !== 'RU' ? String(queryArgs.region).padStart(2,'0') : 'ALL';
+        return JSON.stringify(['kpi', from, to, r, queryArgs.metric]);
+      },
       async queryFn({ period, region }, api) {
-        const flights = await getFlightsOnce(
-          api,
-          period,
-          region && region !== 'RU' ? [region] : undefined
-        );
-
+        const flights = await getFlightsOnce(api, period, region && region !== 'RU' ? [region] : undefined);
         let total = 0, dSum = 0, dCnt = 0;
         for (const f of flights) {
           total += 1;
           const d = durationMin(f);
           if (d > 0) { dSum += d; dCnt += 1; }
         }
-
-        return {
-          data: {
-            totalFlights: total,
-            avgDurationMin: Math.round(dSum / Math.max(dCnt, 1)),
-            ratio: 0,
-            peakHour: undefined,
-          },
-        };
+        return { data: { totalFlights: total, avgDurationMin: Math.round(dSum / Math.max(dCnt, 1)), ratio: 0, peakHour: undefined } };
+      },
+    }),
+    
+    getTimeseries: build.query<TimeseriesPoint[], { period: string; metric: string; region?: string }>({
+      serializeQueryArgs: ({ queryArgs }) => {
+        const [from, to] = periodToRange(queryArgs.period);
+        const r = queryArgs.region && queryArgs.region !== 'RU' ? String(queryArgs.region).padStart(2,'0') : 'ALL';
+        return JSON.stringify(['ts', from, to, r, queryArgs.metric]);
+      },
+      async queryFn({ period, region }, api) {
+        const flights = await getFlightsOnce(api, period, region && region !== 'RU' ? [region] : undefined);
+        const m = new Map<string, number>();
+        for (const f of flights) {
+          const date = String(f.dof ?? '').slice(0, 10);
+          if (date) m.set(date, (m.get(date) ?? 0) + 1);
+        }
+        const data = Array.from(m.entries()).sort(([a], [b]) => (a < b ? -1 : 1)).map(([date, value]) => ({ date, value }));
+        return { data };
       },
     }),
 
-    getTimeseries: build.query<TimeseriesPoint[], { period: string; metric: string; region?: string }>({
+    getLastFlight: build.query<FlightRow | null, { period: string; region?: string }>({
       async queryFn({ period, region }, api) {
+        // Берём полёты из кэша (как KPI/Timeseries)
         const flights = await getFlightsOnce(
           api,
           period,
           region && region !== 'RU' ? [region] : undefined
         );
 
-        const m = new Map<string, number>();
-        for (const f of flights) {
-          const date = String(f.dof ?? '').slice(0, 10);
-          if (date) m.set(date, (m.get(date) ?? 0) + 1);
-        }
+        if (!flights.length) return { data: null };
 
-        const data = Array.from(m.entries())
-          .sort(([a], [b]) => (a < b ? -1 : 1))
-          .map(([date, value]) => ({ date, value }));
-
-        return { data };
+        // последний = максимум по (dof, arr_time/dep_time)
+        const ts = (f: FlightRow) => {
+          const d = String(f.dof ?? '').slice(0, 10);
+          const t = String(f.arr_time || f.dep_time || '00:00:00');
+          return `${d}T${t}`;
+        };
+        const last = flights.reduce((best, f) => (ts(f) > ts(best) ? f : best), flights[0]);
+        return { data: last ?? null };
       },
     }),
-
   }),
 });
 
@@ -811,4 +893,6 @@ export const {
   useGetInsightQuery,
   useGetRegionStatisticsQuery,
   useAddFlightMutation,
+  useGetFlightsRangeQuery,
+  useGetLastFlightQuery,
 } = lctApi;
