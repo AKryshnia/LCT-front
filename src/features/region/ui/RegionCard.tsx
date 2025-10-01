@@ -142,7 +142,7 @@ export default function RegionCard({ code, period }: Props) {
 
 function BigTile({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white border p-3 shadow-[0_1px_2px_rgba(0,0,0,.04)]">
+    <div className="rounded-2xl bg-white border p-3 shadow-[0_1px_2px_rgba(0,0,0,.04)] break-words">
       <div className="text-[28px] sm:text-[30px] leading-none font-semibold tabular-nums">
         {value}
       </div>
