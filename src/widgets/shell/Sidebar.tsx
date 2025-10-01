@@ -24,7 +24,7 @@ export default function Sidebar(){
       <div className="flex flex-col gap-2 mt-12">
         <Item to="/" icon={Home} />
         <Item to="/analytics" icon={BarChart3} />
-        {hasUploadAccess && <Item to="/uploads" icon={Upload} />}
+        {/*}{hasUploadAccess && <Item to="/uploads" icon={Upload} />}*/}
         {hasAdminAccess && <Item to="/admin" icon={Settings} />}
       </div>
     </aside>
