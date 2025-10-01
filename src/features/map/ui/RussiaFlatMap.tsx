@@ -18,7 +18,7 @@ const RU_BOUNDS: L.LatLngBounds = L.latLngBounds([ [41, 19], [81, 180] ]);
 
 // базовая палитра (по значению метрики)
 const baseFill = (v: number) =>
-  v > 80 ? '#0B4A6F' : v > 60 ? '#1379A6' : v > 40 ? '#23A4CF' : v > 20 ? '#66C4E1' : '#BFE8F4';
+  v > 80 ? '#BFE8F4' : v > 60 ? '#66C4E1' : v > 40 ? '#23A4CF' : v > 20 ? '#1379A6' : '#0B4A6F';
 
 /* ───── helpers: цвет и градиент ───── */
 function hexToHsl(hex: string) {
@@ -194,12 +194,12 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
   return (
     <div className="relative">
       <div id="ru-map" className="h-[700px] w-full rounded-2xl overflow-hidden border bg-white" />
-      <div className="absolute left-4 bottom-4 z-[1000]">
+      <div className="absolute right-4 bottom-4 z-[1000] pointer-events-none">
         {overlay ?? (
           <div className="bg-white backdrop-blur border shadow p-3 w-[360px]">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm text-slate-600">Место в рейтинге</div>
-              <div className="text-xl font-semibold tabular-nums">—</div>
+              <div className="text-sm text-slate-600">Количество полётов</div>
+              <div className="text-xl font-semibold tabular-nums"></div>
             </div>
             <div>
               <div className="h-2 rounded-full"
@@ -211,11 +211,6 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
           </div>
         )}
       </div>
-      {sideOverlay && (
-        <div className="absolute right-4 top-4 z-[1000] w-[380px] max-w-[90vw]">
-          {sideOverlay}
-        </div>
-      )}
     </div>
   );
 }

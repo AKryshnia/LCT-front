@@ -73,7 +73,7 @@ export default function KpiTiles(props: Props) {
           <div className="text-3xl font-semibold tabular-nums mt-1 mb-6">
             {totalFlights.toLocaleString('ru-RU')}
           </div>
-          <div className="text-slate-500 text-md">Общее число полетов</div>
+          <div className="text-slate-500 text-md">Общее число полётов</div>
         </CardContent>
       </Card>
 

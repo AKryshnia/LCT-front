@@ -16,11 +16,11 @@ export default function RatingBuilder(){
         <Card><CardContent className="p-4 space-y-4">
           {(['flights','duration','growth'] as const).map(k=> (
             <div key={k}>
-              <div className="flex justify-between text-sm mb-1"><span>{k==='flights'?'Полетов':k==='duration'?'Длительность':'Рост'}</span><span className="tabular-nums">{w[k]}%</span></div>
+              <div className="flex justify-between text-sm mb-1"><span>{k==='flights'?'Полётов':k==='duration'?'Длительность':'Рост'}</span><span className="tabular-nums">{w[k]}%</span></div>
               <Slider value={[w[k]]} onValueChange={(v)=>setW(prev=>({ ...prev, [k]: v[0] }))} max={100} step={1} />
             </div>
           ))}
-          <div className="text-sm text-slate-500">Нормированные веса: полетов {norm.flights}%, длительность {norm.duration}%, рост {norm.growth}%</div>
+          <div className="text-sm text-slate-500">Нормированные веса: полётов {norm.flights}%, длительность {norm.duration}%, рост {norm.growth}%</div>
           <Button onClick={save}>Сохранить пресет</Button>
         </CardContent></Card>
       </div>

@@ -21,7 +21,7 @@ export default function CompareSheet({ all, trigger }:{ all: Region[]; trigger?:
             <label key={r.code} className="flex items-center gap-2">
               <Checkbox checked={picked.includes(r.code)} onCheckedChange={()=>toggle(r.code)} />
               <span className="flex-1">{r.name ?? r.code}</span>
-              <span className="text-xs text-slate-500">{(r.flights ?? 0).toLocaleString('ru-RU')} полетов</span>
+              <span className="text-xs text-slate-500">{(r.flights ?? 0).toLocaleString('ru-RU')} полётов</span>
             </label>
           ))}
         </div>
@@ -32,7 +32,7 @@ export default function CompareSheet({ all, trigger }:{ all: Region[]; trigger?:
               {selected.map(r=> (
                 <div key={r.code} className="rounded-lg bg-white border p-2">
                   <div className="font-medium">{r.name ?? r.code}</div>
-                  <div className="text-slate-500">Полетов: {r.flights ?? '—'}</div>
+                  <div className="text-slate-500">Полётов: {r.flights ?? '—'}</div>
                   <div className="text-slate-500">Длит, ч: {r.duration_h ?? '—'}</div>
                   <div className="text-slate-500">Баллы: {r.score ?? '—'}</div>
                 </div>

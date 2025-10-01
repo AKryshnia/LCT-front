@@ -117,7 +117,7 @@ export const RegionPage: React.FC = () => {
         {/* Тайм-серия */}
         <Card className="col-span-12">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Динамика полетов</CardTitle>
+            <CardTitle className="text-base">Динамика полётов</CardTitle>
           </CardHeader>
           <CardContent>
             <AreaTrend

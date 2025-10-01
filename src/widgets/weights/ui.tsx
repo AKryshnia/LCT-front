@@ -14,7 +14,7 @@ export const WeightsPanel: React.FC<{ onApply?: (w:{flights:number;duration_h:nu
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2">Полетов
+          <label className="flex items-center gap-2">Полётов
             <input type="range" min={0} max={1} step={0.05} value={flights} onChange={(e)=>setFlights(parseFloat(e.target.value))}/>
             <span className="w-10 text-right">{pct(flights)}%</span>
           </label>
