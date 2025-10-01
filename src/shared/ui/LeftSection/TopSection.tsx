@@ -79,10 +79,10 @@ const TopSection: React.FC<TopSectionProps> = ({
       </div>
 
       {/* Инсайт */}
-      <Card className="border border-transparent shadow-none">
+      <Card className="border border-transparent shadow-none bg-transparent">
         <CardContent className="p-4">
           <div className="border-b border-slate-200 mb-4 -mr-10 -ml-10" />
-          <div className="text-xl font-semibold leading-snug">
+          <div className="text-xl font-semibold leading-snug bg-transparent">
             {insight?.title ?? 'Регион N вошёл в топ-3 по росту активности'}
           </div>
           <div className="text-slate-600 mt-1">
