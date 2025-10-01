@@ -19,7 +19,7 @@ type Props = {
 };
 
 const scale = (v: number) =>
-  v > 80 ? '#0B4A6F' : v > 60 ? '#1379A6' : v > 40 ? '#23A4CF' : v > 20 ? '#66C4E1' : '#BFE8F4';
+  v > 80 ? '#BFE8F4' : v > 60 ? '#66C4E1' : v > 40 ? '#23A4CF' : v > 20 ? '#1379A6' : '#0B4A6F';
 
 export default function RussiaChoropleth({
   data,

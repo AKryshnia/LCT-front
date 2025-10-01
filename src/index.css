@@ -178,5 +178,41 @@
     color: #fff; /* акцент */
   }
 
+  .lct-legend {
+    margin: 12px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(4px);
+    pointer-events: none; /* не перехватываем клики — карта под легендой остаётся кликабельной */
+  }
+  
+  .lct-legend__title {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 6px;
+    color: #111827; /* нейтральный тёмный */
+    white-space: nowrap;
+  }
+  
+  .lct-legend__scale {
+    display: grid;
+    grid-template-columns: repeat(5, 16px);
+    gap: 6px;
+    align-items: center;
+  }
+  
+  .lct-legend__swatch {
+    width: 16px;
+    height: 12px;
+    border-radius: 2px;
+  }
+  
+  @media (max-width: 1024px) {
+    .lct-legend { margin: 8px; }
+  }
 
 }

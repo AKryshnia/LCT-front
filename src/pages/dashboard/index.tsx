@@ -26,6 +26,7 @@ import {
   useGetRankQuery,
   useGetRegionsQuery,
   useGetFlightsRangeQuery,
+  useGetRegionStatisticsQuery,
   type FlightRow,
 } from '@/shared/api/lctApi';
 
@@ -215,6 +216,16 @@ export default function DashboardPage() {
   // ⬇️ ВАЖНО: flightsRes — это МАССИВ, не объект с .data
   const flights: FlightRow[] = flightsRes ?? [];
 
+  const totalFlights = React.useMemo(() => {
+    const ids = new Set<string>();
+    for (const f of flights) {
+      const id = (f as any)?.sid?.toString().trim();
+      if (id) ids.add(id);
+    }
+    // если sid нет в данных, fallback к длине массива
+    return ids.size || flights.length;
+  }, [flights]);
+
   const trendData: TrendPoint[] = React.useMemo(() => {
     const weekLabels = new Map<string, string>();
     const bucket = new Map<string, number>();
@@ -371,6 +382,10 @@ export default function DashboardPage() {
   const [isXL, setIsXL] = React.useState<boolean>(() =>
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 1280px)').matches : false
   );
+
+  const { data: stats } = useGetRegionStatisticsQuery({
+    regionCode: selectedRegion ?? 'RU'
+  });
   
   React.useEffect(() => {
     const mq = window.matchMedia('(min-width: 1280px)');
@@ -380,12 +395,12 @@ export default function DashboardPage() {
     return () => mq.removeEventListener?.('change', onChange);
   }, []);
 
-  function RankOverlay({ rank }: { rank: number | null }) {
+  function RankOverlay({ count }: { count: number | null }) {
     return (
-      <div className="rounded-2xl bg-white/90 backdrop-blur-md border shadow-md p-3 w-[380px]">
+      <div className="rounded-2xl bg-white/90 backdrop-blur-md border shadow-md p-3 xl:min-w-[380px] sm:min-w-[280px] xs:min-w-[180px]">
         <div className="flex items-center justify-between">
-          <div className="text-sm text-slate-600">Место в рейтинге</div>
-          <div className="text-xl font-semibold tabular-nums">{rank ?? '—'}</div>
+          <div className="text-sm text-slate-600">Количество полётов</div>
+          <div className="text-xl font-semibold tabular-nums">{count?.toLocaleString('ru-RU') ?? ' '}</div>
         </div>
   
         <div className="mt-3">
@@ -432,8 +447,9 @@ export default function DashboardPage() {
             {typeof rank === 'number' ? rank : '—'}
           </div>
           {trend != null && (
-            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${chipBg}`}>
-              {arrow} {trend > 0 ? `+${trend}` : trend < 0 ? `${trend}` : '0'}
+            <span className={`inline-flex items-center gap-1 border-none bg-transparent px-2 py-0.5 text-xs font-medium ${chipBg}`}>
+              {arrow} 
+              {/*{trend > 0 ? `+${trend}` : trend < 0 ? `${trend}` : '0'}*/}
             </span>
           )}
         </div>
@@ -585,14 +601,8 @@ export default function DashboardPage() {
                   data={mapData}
                   selectedRegion={selectedRegion ?? undefined}
                   onSelect={(code) => setSelectedRegion(code)}
-                  overlay={<RankOverlay rank={rank?.rank ?? null} />}
+                  overlay={<RankOverlay count={stats?.summary?.total_flights ?? null} />}
                 />
-                <div className="flex items-center gap-3">
-                  <div className="text-sm text-slate-600">
-                    Место в рейтинге – {rank?.rank ?? '—'}
-                  </div>
-                  <div className="flex-1" />
-                </div>
               </>
             )}
           </div>
