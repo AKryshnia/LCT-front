@@ -117,7 +117,7 @@ const LoginPage: React.FC = () => {
               <Button
                 type="submit"
                 disabled={!canSubmit}
-                className="h-11 w-40 rounded-[12px] text-[15px]"
+                className="h-11 w-40 rounded-[12px] text-[15px] bg-blue-600"
               >
                 Войти
               </Button>
