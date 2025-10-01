@@ -177,35 +177,35 @@ const AnalyticsPage: React.FC = () => {
           <section className="col-span-12 xl:col-span-9 order-2 space-y-4 relative z-10 xl:pl-6">
           
           {/* ───────── ФИЛЬТРЫ (Регион + Период + Поиск + Выгрузка) ───────── */}
+          {/* ───────── ФИЛЬТРЫ (Регион + Период + Поиск + Выгрузка) ───────── */}
           <div className="sticky top-20 z-20">
             <div>
               <div className="flex flex-wrap md:flex-nowrap items-center gap-3">
 
-                {/* Левая группа: Регион + Период (одинаковые по размеру) */}
+                {/* Левая группа: Регион + Период — одинаковое поведение (Select) */}
                 <div className="flex gap-2">
-                  {/* Регион */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="h-10 w-[180px] justify-between rounded-[16px] border-none text-slate-500"
-                        aria-label="Выбор региона"
-                      >
-                        {selectedRegion ? getRegionName(selectedRegion) : 'Россия'}
-                        <ChevronDown className="w-4 h-4 ml-2" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="max-h-[60vh] overflow-auto z-50">
-                      <DropdownMenuItem onClick={() => setSelectedRegion(null)}>Россия</DropdownMenuItem>
+                  {/* Регион (Select) */}
+                  <Select
+                    value={selectedRegion ?? 'RU'}
+                    onValueChange={(v) => setSelectedRegion(v === 'RU' ? null : v)}
+                  >
+                    <SelectTrigger
+                      className="h-10 w-[180px] rounded-[16px] border-none text-slate-500 bg-white"
+                      aria-label="Выбор региона"
+                    >
+                      <SelectValue placeholder="Россия" />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 max-h-[60vh]">
+                      <SelectItem value="RU">Россия</SelectItem>
                       {(regions ?? []).map((r: any) => (
-                        <DropdownMenuItem key={r.code} onClick={() => setSelectedRegion(String(r.code))}>
+                        <SelectItem key={r.code} value={String(r.code)}>
                           {r.name}
-                        </DropdownMenuItem>
+                        </SelectItem>
                       ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    </SelectContent>
+                  </Select>
 
-                  {/* Период */}
+                  {/* Период (Select) — как был */}
                   <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as any)}>
                     <SelectTrigger
                       className="h-10 w-[180px] rounded-[16px] border-none text-slate-500 bg-white"
@@ -221,9 +221,8 @@ const AnalyticsPage: React.FC = () => {
                   </Select>
                 </div>
 
-                {/* Правая группа: Поиск (шире) + Выгрузка (компактнее) */}
+                {/* Правая группа: Поиск шире, Выгрузка компактнее (высота у всех h-10) */}
                 <div className="flex items-center gap-2 md:ml-auto w-full md:w-auto">
-                  {/* Поле поиска шире кнопки */}
                   <div className="relative flex-1 md:w-[220px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <Input
@@ -232,7 +231,6 @@ const AnalyticsPage: React.FC = () => {
                     />
                   </div>
 
-                  {/* Кнопка выгрузки */}
                   <Button
                     variant="outline"
                     className="h-10 rounded-[16px] px-4 whitespace-nowrap border-none rounded-[12px] bg-sky-200 text-blue-600 hover:bg-sky-300 hover:text-blue-800"

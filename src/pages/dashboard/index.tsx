@@ -491,29 +491,33 @@ export default function DashboardPage() {
               {/* Регион */}
               <div className="flex flex-col gap-1">
                 <div className="text-base font-medium">Регион</div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="justify-between border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-200">
-                      {selectedRegion ? getRegionName(selectedRegion) : 'Россия'}
-                      <ChevronDown className="w-4 h-4 ml-2" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuItem onClick={() => setSelectedRegion(null)}>Россия</DropdownMenuItem>
-                    {(regions ?? []).slice(0, 10).map((r: any) => (
-                      <DropdownMenuItem key={r.code} onClick={() => setSelectedRegion(r.code)}>
+
+                {/* ЕДИНЫЙ КОМПОНЕНТ: Select (вместо DropdownMenu) */}
+                <Select
+                  value={selectedRegion ?? 'RU'}
+                  onValueChange={(v) => setSelectedRegion(v === 'RU' ? null : v)}
+                >
+                  <SelectTrigger
+                    className="h-9 border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-200 justify-between"
+                  >
+                    <SelectValue placeholder="Россия" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[60vh]">
+                    <SelectItem value="RU">Россия</SelectItem>
+                    {(regions ?? []).slice(0, 100).map((r: any) => (
+                      <SelectItem key={r.code} value={String(r.code)}>
                         {r.name}
-                      </DropdownMenuItem>
+                      </SelectItem>
                     ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Период */}
               <div className="flex flex-col gap-1">
                 <div className="text-base font-medium">Период</div>
                 <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as PeriodMode)}>
-                  <SelectTrigger className="h-9 border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-200">
+                  <SelectTrigger className="h-9 border border-slate-100 border-[1px] rounded-[16px] p-6 bg-slate-200 justify-between">
                     <SelectValue placeholder="За квартал" />
                   </SelectTrigger>
                   <SelectContent>
