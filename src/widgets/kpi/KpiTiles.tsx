@@ -26,24 +26,23 @@ type Props =
 export default function KpiTiles(props: Props) {
   // если хотя бы одно из чисел не передано — переходим в «неконтролируемый» режим
   const needFetch =
-    props.totalFlights === undefined ||
-    props.avgDurationMin === undefined ||
-    props.growthPct === undefined ||
-    props.dailyAvg === undefined;
+    props.totalFlights == null ||
+    props.avgDurationMin == null ||
+    props.growthPct == null ||
+    props.dailyAvg == null;
 
-  const region = ('region' in props && props.region) || 'RU';
-  const period = ('period' in props && props.period) || '2025-Q3';
+  const region = props.region ?? 'RU';
+  const period = props.period ?? 'month';
 
   // KPI (totalFlights, avgDurationMin, ratio)
   const { data: kpiData } = useGetKpiQuery(
     { period, region, metric: 'count' },
-    { skip: !needFetch }
+    { skip: !needFetch, refetchOnMountOrArgChange: true }
   );
-
-  // Таймсерия: нужна только чтобы честно посчитать среднесуточное значение
+  
   const { data: tsData } = useGetTimeseriesQuery(
     { period, metric: 'count', region },
-    { skip: !needFetch }
+    { skip: !needFetch, refetchOnMountOrArgChange: true }
   );
 
   // контролируемые значения приходят из props; иначе берём из API
@@ -59,53 +58,49 @@ export default function KpiTiles(props: Props) {
     ? Math.round(Number(kpiData?.ratio ?? 0))
     : Math.round(Number((props as any).growthPct ?? 0));
 
-  // Среднесуточное: если контролируемый режим — берём из props;
-  // иначе считаем по таймсерии (сумма значений / число дней)
   const dailyAvgAuto = React.useMemo(() => {
-    if (!tsData || !Array.isArray(tsData) || tsData.length === 0) return 0;
-    const sum = tsData.reduce((s, p) => s + Number(p?.value ?? 0), 0);
+    if (!tsData?.length) return 0;
+    const sum = tsData.reduce((s, p) => s + Number(p.value ?? 0), 0);
     return Math.round(sum / tsData.length);
   }, [tsData]);
 
-  const dailyAvg = needFetch
-    ? dailyAvgAuto
-    : Number((props as any).dailyAvg ?? 0);
+  const dailyAvg = needFetch ? dailyAvgAuto : Number((props as any).dailyAvg ?? 0);
 
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <Card className="bg-transparent">
+    <div className="grid grid-cols-2 gap-2">
+      <Card className="bg-white border-none w-full h-full">
         <CardContent className="p-4">
-          <div className="text-3xl font-semibold tabular-nums mt-1">
+          <div className="text-3xl font-semibold tabular-nums mt-1 mb-6">
             {totalFlights.toLocaleString('ru-RU')}
           </div>
           <div className="text-slate-500 text-md">Общее число полетов</div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-white border-none">
         <CardContent className="p-4">
-          <div className="text-3xl font-semibold tabular-nums mt-1">
-            {avgDurationMin} <span className="text-slate-500 text-xs">мин</span>
+          <div className="text-3xl font-semibold tabular-nums mt-1 mb-6">
+            {avgDurationMin} <span className="text-slate-400 text-sm">мин</span>
           </div>
           <div className="text-slate-500 text-md">Среднее время</div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-white border-none">
         <CardContent className="p-4">
-          <div className="text-3xl font-semibold tabular-nums mt-1">
+          <div className="text-3xl font-semibold tabular-nums mt-1 mb-6">
             {growthPct}%
           </div>
           <div className="text-slate-500 text-md">Соотношение роста к падению</div>
         </CardContent>
       </Card>
 
-      <Card className="bg-foreground text-background">
+      <Card className="bg-gray-900 border-none">
         <CardContent className="p-4">
-          <div className="text-3xl font-semibold tabular-nums mt-1">
+          <div className="text-3xl font-semibold text-gray-50 tabular-nums mt-1 mb-6">
             {dailyAvg.toLocaleString('ru-RU')}
           </div>
-          <div className="text-slate-100 text-md">Среднесуточная статистика</div>
+          <div className="text-gray-50 text-md">Среднесуточная статистика</div>
         </CardContent>
       </Card>
     </div>

@@ -196,7 +196,7 @@ export default function RussiaFlatMap({ data = [], onSelect, selectedRegion, ove
       <div id="ru-map" className="h-[700px] w-full rounded-2xl overflow-hidden border bg-white" />
       <div className="absolute left-4 bottom-4 z-[1000]">
         {overlay ?? (
-          <div className="rounded-2xl bg-white/90 backdrop-blur border shadow p-3 w-[360px]">
+          <div className="bg-white backdrop-blur border shadow p-3 w-[360px]">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm text-slate-600">Место в рейтинге</div>
               <div className="text-xl font-semibold tabular-nums">—</div>

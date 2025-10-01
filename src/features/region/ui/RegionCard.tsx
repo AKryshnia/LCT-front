@@ -7,43 +7,28 @@ import {
   useGetRegionStatisticsQuery,
 } from '@/shared/api/lctApi';
 import { getRegionName } from '@/shared/constants/regions';
-import KpiTiles from '@/widgets/kpi/KpiTiles';
 
 type Props = {
   code: string;   // "77"
   period: string; // "2025" | "2025-Q3"
 };
 
+const fmt = (n?: number | null) =>
+  n == null ? '—' : new Intl.NumberFormat('ru-RU').format(n);
+
 export default function RegionCard({ code, period }: Props) {
   const fallbackName = getRegionName(code);
 
-  // Справочник регионов
-  const { data: regions, isLoading: isLoadingRegions } = useGetRegionsQuery();
-
-  // Серверная статистика региона (заменяет клиентский KPI)
-  const { data: stats, isLoading: isLoadingStats } = useGetRegionStatisticsQuery({
-    regionCode: code,
-  });
-
-  // Rank data for the region
-  const { data: rank, isLoading: isLoadingRank } = useGetRankQuery({
-    period,
-    metric: 'count',
-    region: code,
-  });
-
-  const regionFromApi = React.useMemo(
+  // справочник регионов
+  const { data: regions } = useGetRegionsQuery();
+  const region = React.useMemo(
     () => (regions ?? []).find((r) => String(r.code) === String(code)),
     [regions, code]
   );
-  const capital = regionFromApi?.capital?.name;
 
-  // Имя региона
-  const title = regionFromApi?.name || fallbackName;
-
-  // Население: может быть строкой "1 234 567" или числом
-  const populationNum: number | undefined = React.useMemo(() => {
-    const raw = regionFromApi?.population;
+  const title = region?.name || fallbackName || `Регион ${code}`;
+  const populationNum = React.useMemo(() => {
+    const raw = region?.population;
     if (raw == null) return undefined;
     if (typeof raw === 'number') return raw;
     if (typeof raw === 'string') {
@@ -51,88 +36,137 @@ export default function RegionCard({ code, period }: Props) {
       return Number.isFinite(n) ? n : undefined;
     }
     return undefined;
-  }, [regionFromApi?.population]);
+  }, [region?.population]);
 
-  const loading = isLoadingRegions || isLoadingStats || isLoadingRank;
+  // серверная статистика (если появятся поля — подставятся)
+  const { data: stats } = useGetRegionStatisticsQuery({ regionCode: code });
 
-  // KPI из серверной статистики:
-  // totalFlights — прямо из summary
-  // avgDurationMin — взвешенная средняя по годам, где avg_flight_time приходит в часах → переводим в минуты
-  const totalFlights = stats?.summary?.total_flights ?? 0;
-  const avgDurationMin = React.useMemo(() => {
-    const byYear = stats?.statistics?.by_year ?? [];
-    if (!byYear.length) return 0;
-    const flightsSum = byYear.reduce((s, y) => s + (y.flight_count ?? 0), 0);
-    if (!flightsSum) return 0;
-    const durationHoursWeighted = byYear.reduce(
-      (s, y) => s + (y.avg_flight_time ?? 0) * (y.flight_count ?? 0),
-      0
-    );
-    return Math.round((durationHoursWeighted / flightsSum) * 60); // в минуты
-  }, [stats?.statistics?.by_year]);
+  // рейтинг
+  const { data: rank } = useGetRankQuery({
+    period,
+    metric: 'count',
+    region: code,
+  });
+
+  // ⚙️ возможные источники для «Площадь региона» (пока плейсхолдер)
+  const areaKm2 =
+    (stats as any)?.meta?.area_km2 ??
+    (region as any)?.area_km2 ??
+    (region as any)?.area ??
+    null;
 
   return (
-    <Card className="shadow-xl">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded bg-sky-100 border flex items-center justify-center text-sky-700 font-semibold">
-            {code}
+    <Card className="bg-[#F3F5F8] border-0 shadow-none">
+      <CardContent className="p-4 sm:p-5">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            {/* герб / эмблема — плейсхолдер */}
+            <div className="w-10 h-10 rounded-md bg-sky-100 border border-sky-200 flex items-center justify-center">
+              <span className="text-sky-700 text-sm font-semibold">{code}</span>
+            </div>
+            <div>
+              <div className="text-xl font-semibold leading-tight">{title}</div>
+              <div className="text-slate-500 text-xs mt-0.5">{code} регион</div>
+            </div>
           </div>
-          <div>
-            <div className="text-lg font-semibold leading-tight">{title}</div>
-            <div className="text-xs text-slate-500">
-              {loading ? 'Загрузка…' : `Код региона: ${code}`}
+          {/* ← стрелку «назад» держим выше по иерархии страницы; здесь только статус */}
+        </div>
+
+        {/* Статус «Небо — Открыто» */}
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-[13px] font-medium text-slate-700">Небо</div>
+          <div className="inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+            Открыто
+          </div>
+        </div>
+
+        {/* Две большие плитки */}
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <BigTile
+            label="Численность населения"
+            value={fmt(populationNum)}
+          />
+          <BigTile
+            label="Площадь региона"
+            value={areaKm2 ? `${fmt(areaKm2)} км²` : '—'}
+          />
+        </div>
+
+        {/* Ответственный */}
+        <div className="mt-4">
+          <div className="text-[13px] font-medium text-slate-700 mb-2">
+            Ответственный за БАС
+          </div>
+          <div className="flex items-center gap-3 rounded-xl bg-white border p-2.5">
+            <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center">
+              {/* если будет аватар — поставьте <img className="w-full h-full object-cover" src={...} /> */}
+              <span className="text-slate-600 text-xs font-semibold">ОВ</span>
+            </div>
+            <div className="leading-tight">
+              <div className="text-[13px] font-semibold text-slate-800">
+                Олег Иванов
+              </div>
+              <div className="text-[12px] text-slate-500">@Oleg_Z_Ivanov</div>
             </div>
           </div>
         </div>
 
-        {/* Основные метрики */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-slate-50 p-3">
-            <div className="text-slate-500 text-xs mb-1">Численность населения</div>
-            <div className="text-xl font-semibold tabular-nums">
-              {populationNum != null ? populationNum.toLocaleString('ru-RU') : '—'}
-            </div>
-          </div>
-          <div className="rounded-xl bg-slate-50 p-3">
-            <div className="text-slate-500 text-xs mb-1">Площадь региона, км²</div>
-            <div className="text-xl font-semibold tabular-nums">—</div>
-          </div>
+        {/* Двухколоночный список пунктов */}
+        <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4">
+          <Field
+            title="Программа развития БАС"
+            value="Принята 20.12.2024"
+          />
+          <Field title="Наличие ЭПР" value="Есть" />
+          <Field
+            title="Специализация региона"
+            value="Система передачи данных с БВС"
+            hint="(пример)"
+          />
+          <Field title="Наличие работ по БЭК" value="Есть" />
+          <Field title="Наличие полигона БАС" value="Есть" />
+          <Field title="Наличие НПЦ" value="Крупный" />
+          <Field
+            title="Процент оснащённости школ БАС"
+            value={`${(stats as any)?.education?.uav_schools_share ?? 12}%`}
+          />
+          <Field title="Рейтинг региона" value={fmt(rank?.rank as any)} />
         </div>
-
-        {capital && (
-          <div className="rounded-xl bg-white border p-3 text-sm">
-            <div className="text-slate-500 text-xs">Административный центр</div>
-            <div className="mt-1">{capital}</div>
-          </div>
-        )}
-
-        {/* Краткая сводка по БВС (из server-side statistics) */}
-        <div className="rounded-xl border p-3">
-          <div className="text-slate-500 text-xs">Полёты БВС за период</div>
-          <div className="mt-1 text-base">
-            <span className="font-semibold tabular-nums">
-              {totalFlights ? totalFlights.toLocaleString('ru-RU') : '—'}
-            </span>{' '}
-            полётов, средняя длительность —{' '}
-            <span className="tabular-nums font-semibold">
-              {avgDurationMin || '—'}
-            </span>{' '}
-            мин
-          </div>
-        </div>
-
-        {/* Рейтинг */}
-        <div className="rounded-xl bg-white border p-3">
-          <div className="text-slate-500 text-xs">Рейтинг региона</div>
-          <div className="text-2xl font-semibold tabular-nums mt-1">
-            {rank?.rank ?? '—'}
-          </div>
-        </div>
-
-        {/* Блок профиля (убран, потому что на бэке нет эндпоинта /profile).
-            Если появится — вернём с реальными данными. */}
       </CardContent>
     </Card>
+  );
+}
+
+/* ───────── small building blocks ───────── */
+
+function BigTile({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl bg-white border p-3 shadow-[0_1px_2px_rgba(0,0,0,.04)]">
+      <div className="text-[28px] sm:text-[30px] leading-none font-semibold tabular-nums">
+        {value}
+      </div>
+      <div className="mt-1 text-[13px] text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+function Field({
+  title,
+  value,
+  hint,
+}: {
+  title: string;
+  value: React.ReactNode;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <div className="text-[13px] font-medium text-slate-700">{title}</div>
+      <div className="mt-1 text-[13px] text-slate-500 leading-snug">
+        {value}
+        {hint ? <span className="text-slate-400"> {hint}</span> : null}
+      </div>
+    </div>
   );
 }

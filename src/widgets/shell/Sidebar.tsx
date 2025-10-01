@@ -19,7 +19,7 @@ export default function Sidebar(){
   const hasAdminAccess = roles.some(r => ['admin'].includes(r));
 
   return (
-    <aside className="w-16 shrink-0 border-r bg-white flex flex-col items-center py-4 gap-4">
+    <aside className="w-16 shrink-0 border-r bg-white flex flex-col items-center py-4 gap-4 sticky top-0 z-[2000]">
       <img src="/avatar.png" alt="avatar" className="w-10 h-10 rounded-full object-cover" />
       <div className="flex flex-col gap-2 mt-12">
         <Item to="/" icon={Home} />
