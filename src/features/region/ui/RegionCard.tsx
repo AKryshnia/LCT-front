@@ -94,7 +94,7 @@ export default function RegionCard({ code, period }: Props) {
           />
         </div>
 
-        {/* Ответственный */}
+        {/* Ответственный (хардкод) */}
         <div className="mt-4">
           <div className="text-[13px] font-medium text-slate-700 mb-2">
             Ответственный за БАС

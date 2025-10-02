@@ -199,10 +199,11 @@ const makeRangeKey = (from: string, to: string, regionKey?: string | number | nu
 
 type BoundBQ = (args: string | FetchArgs) => Promise<{ data?: any; error?: FetchBaseQueryError }>;
 
-const PAGE_SIZE = 2000;
-// для Laravel достаточно per_page
+const PAGE_SIZE = Number(((import.meta as any)?.env?.VITE_FLIGHTS_PER_PAGE) ?? 500);
+const MAX_PAGES = Number(((import.meta as any)?.env?.VITE_FLIGHTS_MAX_PAGES) ?? 120);
+const MAX_RECORDS = Number(((import.meta as any)?.env?.VITE_FLIGHTS_MAX_RECORDS) ?? (MAX_PAGES * PAGE_SIZE));
+
 const PAGE_KEYS = ['per_page'] as const;
-const CONCURRENCY = 6;
 const FLIGHTS_TTL_MS = 24 * 60 * 60 * 1000;
 
 // дедупликация «в полёте» по одинаковым url+params
@@ -222,6 +223,8 @@ const parseLastFromLinks = (links: any): number | undefined => {
   const m = /[?&]page=(\d+)/.exec(u);
   return m ? +m[1] : undefined;
 };
+
+type FlightsCache = { savedAt: number; items: any[] } | null;
 
 async function tryMany(
   bq: (a: string | FetchArgs) => Promise<{ data?: any; error?: any }>,
@@ -265,41 +268,56 @@ async function detectPageKey(
   return { key: undefined, firstData: data, lastPage: last };
 }
 
+function pageSignature(arr: any[]): string {
+  if (!Array.isArray(arr) || arr.length === 0) return 'empty:0';
+  const f = arr[0] ?? {};
+  const l = arr[arr.length - 1] ?? {};
+  const first = f.id ?? f.sid ?? JSON.stringify(f).slice(0, 64);
+  const last  = l.id ?? l.sid ?? JSON.stringify(l).slice(0, 64);
+  return `${first}-${last}-${arr.length}`;
+}
+
 async function fetchAllPagesSmart(
   bq: BoundBQ,
   url: string,
   params: Record<string, any>,
   cacheKey: string
 ): Promise<any[]> {
-  const cached = await idbCache.get(cacheKey);
+  const cached = (await idbCache.get(cacheKey)) as FlightsCache;
   if (cached && Date.now() - cached.savedAt < FLIGHTS_TTL_MS) return cached.items;
 
   const inflightKey = cacheKey;
   if (inflightPages.has(inflightKey)) return inflightPages.get(inflightKey)!;
 
   const run = (async () => {
-    const { key, firstData, lastPage } = await detectPageKey(bq, url, params);
-    if (!lastPage || lastPage === 1) {
-      await idbCache.set(cacheKey, { savedAt: Date.now(), items: firstData });
-      return firstData;
+    // 1) определяем поддерживаемый ключ per-page и берём первую страницу
+    const { key, firstData } = await detectPageKey(bq, url, params);
+    let all: any[] = Array.isArray(firstData) ? [...firstData] : [];
+    let page = 1;
+    let prevSig = pageSignature(firstData);
+    if (all.length === 0) {
+      await idbCache.set(cacheKey, { savedAt: Date.now(), items: [] });
+      return [];
     }
 
-    const pages = Array.from({ length: lastPage - 1 }, (_, i) => i + 2);
-    const results: any[][] = [];
-    for (let i = 0; i < pages.length; i += CONCURRENCY) {
-      const batch = pages.slice(i, i + CONCURRENCY);
-      const reqs = batch.map((page) =>
-        bq({ url, params: { ...params, page, ...(key ? { [key]: PAGE_SIZE } : {}) } })
-          .then((r) => {
-            const body: any = (r as any).data ?? {};
-            return Array.isArray(body) ? body : (body.data ?? []);
-          })
-      );
-      const chunk = await Promise.all(reqs);
-      results.push(...chunk);
+    // 2) последовательный пэйджинг с ранним стопом
+    while (true) {
+      if (page >= MAX_PAGES) break;
+      if (all.length >= MAX_RECORDS) break;
+
+      page += 1;
+      const res = await bq({ url, params: { ...params, page, ...(key ? { [key]: PAGE_SIZE } : {}) } });
+      const body: any = (res as any).data ?? {};
+      const arr: any[] = Array.isArray(body) ? body : (body.data ?? []);
+      const sig = pageSignature(arr);
+      if (arr.length === 0 || sig === prevSig) break;         // пустая/дубликат → стоп
+
+      all.push(...arr);
+      prevSig = sig;
+
+      if (key && arr.length < PAGE_SIZE) break;               // короткая страница → стоп
     }
 
-    const all = firstData.concat(...results);
     await idbCache.set(cacheKey, { savedAt: Date.now(), items: all });
     return all;
   })();
