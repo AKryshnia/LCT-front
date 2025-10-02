@@ -2,18 +2,14 @@ import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card'; // остаётся только для ЛЕВОЙ панели
-import { useGetRegionsQuery, useGetRegionStatisticsQuery } from '@/shared/api/lctApi';
+import { useGetRegionsQuery, useGetRegionStatisticsQuery, useGetKpiQuery } from '@/shared/api/lctApi';
 import AreaTrend from '@/widgets/charts/AreaTrend';
-import { BarChart3, Plane, GitCompare, Table, Share2, Search, ChevronDown} from 'lucide-react';
+import { BarChart3, Plane, GitCompare, Table, Share2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { getRegionName } from '@/shared/constants/regions';
 
 type TabKey = 'overview' | 'trends' | 'compare' | 'table' | 'links';
 
@@ -48,20 +44,23 @@ const AnalyticsPage: React.FC = () => {
   const { data: regions } = useGetRegionsQuery();
   const { data: stats } = useGetRegionStatisticsQuery({ regionCode: region });
 
-  const totalFlights = stats?.summary?.total_flights ?? 0;
   const weeksCovered = stats?.summary?.weeks_covered ?? 0;
   const byYear = stats?.statistics?.by_year ?? [];
   const byYm = stats?.statistics?.by_year_and_month ?? [];
 
-  const avgDurationMin = React.useMemo(() => {
-    if (!byYear.length) return 0;
-    const totalFlightsAll = byYear.reduce((s: number, y: any) => s + (y.flight_count ?? 0), 0);
-    const totalDurationAll = byYear.reduce(
-      (s: number, y: any) => s + (y.avg_flight_time ?? 0) * (y.flight_count ?? 0),
-      0
-    );
-    return totalFlightsAll ? Math.round((totalDurationAll / totalFlightsAll) * 60) : 0;
-  }, [byYear]);
+  // KPI напрямую из эндпоинта (ничего не считаем на фронте)
+  const [selectedRegion, setSelectedRegion] = React.useState<string | null>(searchParams.get('region') ?? '77'); // Москва по умолчанию
+  const urlPeriod = (searchParams.get('period') as 'month' | 'quarter' | 'year' | null);
+  const [periodMode, setPeriodMode] = React.useState<'month' | 'quarter' | 'year'>(urlPeriod ?? 'year');
+
+  const { data: kpi, isFetching: kpiLoading } = useGetKpiQuery({
+    period: periodMode,              // 'year' | 'quarter' | 'month'
+    region: selectedRegion ?? 'RU',  // 'RU' = вся Россия
+    metric: 'avg_duration',
+  });
+
+  const totalFlights = kpi?.totalFlights ?? stats?.summary?.total_flights ?? 0;
+  const avgDurationMin = kpi?.avgDurationMin ?? 0;
 
   const trendSeries = React.useMemo(() => {
     if (!byYm.length) return [];
@@ -73,7 +72,14 @@ const AnalyticsPage: React.FC = () => {
     }));
   }, [byYm]);
 
-  const regionName = regions?.find((r: any) => r.code === region)?.name ?? 'Регион';
+  // форматер "минуты → 'H ч M мин'"
+  const fmtHM = (mins: number) => {
+    if (!Number.isFinite(mins)) return '—';
+    const m = Math.max(0, Math.round(mins));
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return `${h} ч ${mm} мин`;
+  };
 
   // ===== full-bleed серый фон справа (как на главной) =====
   const rootRef = React.useRef<HTMLDivElement | null>(null);
@@ -98,16 +104,7 @@ const AnalyticsPage: React.FC = () => {
     return () => window.removeEventListener('resize', onResize);
   }, [measureRightBg]);
 
-
   const isXL = useMediaQuery('(min-width: 1280px)');
-
-  // читаем из URL (как на главной)
-  const urlRegion = searchParams.get('region');
-  const urlPeriod = (searchParams.get('period') as 'month'|'quarter'|'year'|null);
-
-  // локальный стейт
-  const [selectedRegion, setSelectedRegion] = React.useState<string | null>(urlRegion ?? '77'); // Москва по умолчанию
-  const [periodMode, setPeriodMode] = React.useState<'month'|'quarter'|'year'>(urlPeriod ?? 'year');
 
   // запись обратно в URL
   React.useEffect(() => {
@@ -117,8 +114,6 @@ const AnalyticsPage: React.FC = () => {
     setSearchParams(p, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRegion, periodMode]);
-
-  // ========================================================
 
   return (
     <div ref={rootRef} className="relative isolate min-h-screen bg-slate-50 xl:bg-white">
@@ -254,7 +249,7 @@ const AnalyticsPage: React.FC = () => {
                   <div className="rounded-2xl bg-white border border-slate-200 p-4">
                     <div className="text-sm font-medium text-slate-600">Средняя длительность</div>
                     <div className="mt-2 text-3xl font-bold">
-                      {Math.floor(avgDurationMin / 60)} ч {avgDurationMin % 60} мин
+                      {kpiLoading ? '…' : fmtHM(avgDurationMin)}
                     </div>
                   </div>
                   <div className="rounded-2xl bg-white border border-slate-200 p-4">
@@ -276,7 +271,7 @@ const AnalyticsPage: React.FC = () => {
                 <div className="text-base font-medium mb-3">Временные ряды полётов</div>
                 <AreaTrend data={trendSeries} />
                 <p className="text-sm text-slate-500 mt-4">
-                  Детальная таблица появится при интеграции с /api/flight.
+                  Полнофункциональный раздел в разработке...
                 </p>
               </div>
             )}
