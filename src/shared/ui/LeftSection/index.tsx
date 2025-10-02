@@ -42,7 +42,6 @@ const LeftSection: React.FC<LeftSectionProps> = ({
     apiPeriod={apiPeriod}
   />
   <BottomSection
-    className="bg-white"
     selectedRegion={selectedRegion}
     apiPeriod={apiPeriod}
     trendData={trendData}
